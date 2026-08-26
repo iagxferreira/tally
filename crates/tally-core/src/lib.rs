@@ -2,3 +2,7 @@
 //!
 //! This crate has no dependencies and no knowledge of HTTP, SQL, or message
 //! brokers. Everything here is a value type or a rule about value types.
+
+mod currency;
+
+pub use currency::Currency;
