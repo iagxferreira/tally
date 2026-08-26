@@ -1,0 +1,28 @@
+[workspace]
+resolver = "3"
+members = ["crates/tally-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/iagoferreira/tally"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+# Principle 2: financial amounts must never use floating point.
+# This makes the rule mechanical rather than cultural.
+float_arithmetic = "deny"
+# Silent wrapping / truncation is how ledgers lose money.
+arithmetic_side_effects = "deny"
+cast_possible_truncation = "deny"
+
+[profile.release]
+# Rust wraps integer overflow in release builds by default. In a ledger a
+# silently wrapped balance is the worst possible failure. Defense in depth:
+# our arithmetic already returns Result, but if a raw `+` ever slips in we
+# want a panic, not corrupt money.
+overflow-checks = true
