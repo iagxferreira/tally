@@ -1,18 +1,18 @@
-[workspace]
-resolver = "3"
-members = ["crates/tally-core"]
-
-[workspace.package]
+[package]
+name = "tally"
+description = "A double-entry financial ledger exploring correctness, consistency, and failure handling"
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/iagoferreira/tally"
 
-[workspace.lints.rust]
+[dependencies]
+
+[lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
 
-[workspace.lints.clippy]
+[lints.clippy]
 # Principle 2: financial amounts must never use floating point.
 # This makes the rule mechanical rather than cultural.
 float_arithmetic = "deny"

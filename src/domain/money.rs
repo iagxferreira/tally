@@ -9,7 +9,7 @@
 
 use core::fmt;
 
-use crate::currency::Currency;
+use super::currency::Currency;
 
 /// An exact monetary amount in a single currency.
 ///
@@ -47,7 +47,7 @@ impl Money {
     /// nothing to fail on.
     ///
     /// ```
-    /// # use tally_core::{Currency, Money};
+    /// # use tally::{Currency, Money};
     /// let ten_fifty = Money::from_minor_units(1_050, Currency::Usd);
     /// assert_eq!(ten_fifty.to_string(), "10.50 USD");
     /// ```
@@ -240,7 +240,7 @@ impl core::error::Error for MoneyError {}
 #[cfg(test)]
 mod tests {
     use super::{Money, MoneyError};
-    use crate::currency::Currency;
+    use crate::domain::Currency;
     use core::cmp::Ordering;
 
     const fn usd(minor_units: i64) -> Money {

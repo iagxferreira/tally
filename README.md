@@ -39,9 +39,11 @@ them is a compile error rather than a runtime incident.
 
 ### Implemented
 
-- Cargo workspace (edition 2024), pinned toolchain, CI-ready lint policy
+- Single crate (edition 2024), pinned toolchain, CI-ready lint policy
 - Lint policy that **denies floating-point arithmetic** crate-wide, and enables
   integer overflow checks in release builds
+- A `domain` module holding the pure financial model, with no infrastructure
+  dependencies
 - `Currency` — closed enum carrying its ISO 4217 code and decimal scale
   (all three real-world scales represented: JPY = 0, USD/EUR/GBP/BRL = 2, KWD = 3)
 - `Money` — exact amounts as `i64` minor units + currency, with fallible
@@ -105,6 +107,21 @@ Invariant 3 is referential and requires the ledger as context.
 
 ---
 
+## Layout
+
+```
+src/lib.rs        crate root
+src/domain.rs     the pure financial domain
+src/domain/       currency, money (accounts and transactions to follow)
+docs/adr/         decision records
+```
+
+Tally is deliberately a single crate. Splitting the domain into its own crate
+would make its independence from infrastructure a compile error rather than a
+convention, but there is no infrastructure to exclude yet, and the split is a
+cheap mechanical refactor when there is. See
+[ADR 002](docs/adr/002-crate-and-module-layout.md).
+
 ## Getting started
 
 Requires the toolchain pinned in `rust-toolchain.toml` (rustup will fetch it
@@ -124,6 +141,7 @@ cargo fmt --all --check
 - `docs/concepts/` — ledger and distributed-systems concepts *(not written yet)*
 - `docs/adr/` — architecture decision records:
   - [001 — Money representation](docs/adr/001-money-representation.md)
+  - [002 — Crate and module layout](docs/adr/002-crate-and-module-layout.md)
 
 ADRs are written only for decisions actually made. There are no placeholder
 records for future phases.

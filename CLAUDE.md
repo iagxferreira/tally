@@ -50,14 +50,23 @@ mode before fixing it.
 ## Layout
 
 ```
-crates/tally-core/     pure domain — no Axum, SQLx, Kafka, or Tokio
-crates/tally-storage/  not created yet (Phase 2)
-crates/tally-api/      not created yet (Phase 3)
-docs/adr/              decision records for decisions actually made
+src/lib.rs        crate root, re-exports the domain
+src/domain.rs     pure domain — no Axum, SQLx, Kafka, or Tokio
+src/domain/       currency, money, and (later) accounts, postings, transactions
+docs/adr/         decision records for decisions actually made
 ```
 
-New crates are introduced only when justified. Do not create empty crates in
-anticipation of a future phase.
+Tally is a **single crate**, not a workspace. Do not reintroduce a `crates/`
+directory, and do not create crates in anticipation of a future phase.
+
+The domain's independence from infrastructure is therefore a convention here,
+not a compile error. Guard it deliberately: nothing under `src/domain/` may
+import an infrastructure dependency. When the first such dependency is added
+(likely `sqlx` in Phase 2), stop and revisit ADR 002 — that is the trigger for
+extracting `tally-core` into its own crate, and it is a mechanical refactor.
+
+Prefer the modern module style: `src/domain.rs` alongside `src/domain/`, not
+`src/domain/mod.rs`.
 
 ## Errors
 
