@@ -9,10 +9,12 @@
 //! balances. Accounts themselves, postings, transactions and the ledger do not
 //! exist yet.
 
+mod account;
 mod currency;
 mod direction;
 mod money;
 
+pub use account::AccountKind;
 pub use currency::Currency;
 pub use direction::Direction;
 pub use money::{Money, MoneyError};
