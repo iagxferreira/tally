@@ -7,6 +7,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/iagoferreira/tally"
 
 [dependencies]
+# The domain's only dependency. uuid is a value-type library, not
+# infrastructure: it brings no I/O, no runtime, and no framework, so it does
+# not breach the rule that the domain stays free of infrastructure.
+uuid = { version = "1", features = ["v7"] }
 
 [lints.rust]
 unsafe_code = "forbid"

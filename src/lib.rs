@@ -11,4 +11,4 @@
 
 pub mod domain;
 
-pub use domain::{AccountKind, Currency, Direction, Money, MoneyError};
+pub use domain::{AccountId, AccountKind, Currency, Direction, Money, MoneyError};

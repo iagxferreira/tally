@@ -1,9 +1,77 @@
-//! Account classification and the sign rule for deriving balances.
+//! Account identity, classification, and the sign rule for deriving balances.
 
 use core::fmt;
 
+use uuid::Uuid;
+
 use super::direction::Direction;
 use super::money::{Money, MoneyError};
+
+/// The identity of an account within a ledger.
+///
+/// A newtype over [`Uuid`] rather than a bare `Uuid`, so that an `AccountId`
+/// cannot be passed where a `TransactionId` is expected. The wrapper is
+/// `#[repr(transparent)]` and therefore free: an `AccountId` has exactly the
+/// layout of the `Uuid` it contains, and the safety is entirely a compile-time
+/// property.
+///
+/// # Why version 7
+///
+/// A v4 UUID is 122 random bits, which scatters inserts uniformly across a
+/// B-tree index: every write touches a different page and the index working
+/// set becomes the whole index. A v7 UUID carries a 48-bit Unix millisecond
+/// timestamp in its high bits, so identifiers generated near in time sort near
+/// each other. Inserts land at the right edge of the tree, pages stay hot, and
+/// the journal reads back in roughly insertion order.
+///
+/// Both versions give the same uniqueness guarantee without coordination,
+/// which is what lets any node mint an identifier without consulting a central
+/// sequence. Version 7 simply behaves better once the identifiers reach
+/// storage, and the choice is expensive to reverse after there is data.
+///
+/// Because UUIDs are laid out big-endian, the derived [`Ord`] sorts by those
+/// timestamp bits, so ordering identifiers approximates ordering by creation
+/// time. That is a convenience, not a guarantee: two identifiers minted in the
+/// same millisecond order by their random bits, and clocks can move backwards.
+/// Never treat this as a substitute for a real timestamp.
+///
+/// There is deliberately no `Default` implementation. A "default account" is
+/// meaningless, and `Uuid::nil()` would silently collide for every caller that
+/// forgot to set one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct AccountId(Uuid);
+
+impl AccountId {
+    /// Mints a new identifier from the current time.
+    #[must_use]
+    pub fn generate() -> Self {
+        Self(Uuid::now_v7())
+    }
+
+    /// Reconstructs an identifier that already exists, such as one read back
+    /// from storage.
+    ///
+    /// This does not check the UUID version: an identifier persisted before a
+    /// version change is still that account's identity, and rejecting it would
+    /// lose data rather than protect anything.
+    #[must_use]
+    pub const fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// The underlying UUID, for storage and serialization boundaries.
+    #[must_use]
+    pub const fn as_uuid(self) -> Uuid {
+        self.0
+    }
+}
+
+impl fmt::Display for AccountId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
 
 /// The classification of an account, which determines how postings affect its
 /// balance.
@@ -114,8 +182,9 @@ impl fmt::Display for AccountKind {
 
 #[cfg(test)]
 mod tests {
-    use super::AccountKind;
+    use super::{AccountId, AccountKind};
     use crate::domain::{Currency, Direction, Money, MoneyError};
+    use uuid::Uuid;
 
     const ALL_KINDS: [AccountKind; 5] = [
         AccountKind::Asset,
@@ -127,6 +196,48 @@ mod tests {
 
     fn usd(minor_units: i64) -> Money {
         Money::from_minor_units(minor_units, Currency::Usd)
+    }
+
+    #[test]
+    fn identifiers_are_sixteen_byte_copy_values() {
+        assert_eq!(size_of::<AccountId>(), size_of::<Uuid>());
+        let a = AccountId::generate();
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn generated_identifiers_are_distinct() {
+        let a = AccountId::generate();
+        let b = AccountId::generate();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn generated_identifiers_are_version_seven() {
+        assert_eq!(AccountId::generate().as_uuid().get_version_num(), 7);
+    }
+
+    #[test]
+    fn ordering_follows_the_leading_timestamp_bits() {
+        // UUIDs are big-endian, so the derived Ord compares the v7 timestamp
+        // prefix first. Built from fixed values rather than the clock, so the
+        // property is asserted without depending on timing.
+        let earlier = AccountId::from_uuid(Uuid::from_u128(1));
+        let later = AccountId::from_uuid(Uuid::from_u128(2));
+        assert!(earlier < later);
+    }
+
+    #[test]
+    fn round_trips_through_its_uuid() {
+        let id = AccountId::generate();
+        assert_eq!(AccountId::from_uuid(id.as_uuid()), id);
+    }
+
+    #[test]
+    fn display_is_the_hyphenated_uuid() {
+        let id = AccountId::from_uuid(Uuid::nil());
+        assert_eq!(id.to_string(), "00000000-0000-0000-0000-000000000000");
     }
 
     #[test]
