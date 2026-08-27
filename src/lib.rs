@@ -11,4 +11,4 @@
 
 pub mod domain;
 
-pub use domain::{Currency, Money, MoneyError};
+pub use domain::{Currency, Direction, Money, MoneyError};

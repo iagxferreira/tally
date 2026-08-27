@@ -4,11 +4,15 @@
 //! drivers, no brokers, and no async runtime unless the domain itself genuinely
 //! requires one. Everything here is a value type or a rule about value types.
 //!
-//! Currently modelled: currencies and exact monetary amounts. Accounts,
-//! postings, transactions and the ledger itself do not exist yet.
+//! Currently modelled: currencies, exact monetary amounts, posting direction,
+//! and the account classification that determines how postings affect
+//! balances. Accounts themselves, postings, transactions and the ledger do not
+//! exist yet.
 
 mod currency;
+mod direction;
 mod money;
 
 pub use currency::Currency;
+pub use direction::Direction;
 pub use money::{Money, MoneyError};
