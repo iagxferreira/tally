@@ -58,6 +58,7 @@ them is a compile error rather than a runtime incident.
   the accounting equation rather than written out as a truth table
 - `Account` — identity, kind and a currency fixed at opening; applies the sign
   rule and rejects amounts in any other currency
+  ([ADR 004](docs/adr/004-single-currency-accounts.md))
 
 ### Experimental
 
@@ -152,6 +153,7 @@ cargo fmt --all --check
   - [001 — Money representation](docs/adr/001-money-representation.md)
   - [002 — Crate and module layout](docs/adr/002-crate-and-module-layout.md)
   - [003 — Account identity](docs/adr/003-account-identity.md)
+  - [004 — Single-currency accounts](docs/adr/004-single-currency-accounts.md)
 
 ADRs are written only for decisions actually made. There are no placeholder
 records for future phases.
