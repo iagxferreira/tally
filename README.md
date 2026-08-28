@@ -5,9 +5,10 @@
 > ### Status: early development
 >
 > Tally is **not production-ready**, and no claim of production-readiness will be
-> made here until there is evidence to support it. At the time of writing, only
-> the monetary value type exists. The status table below is the source of truth —
-> please read it before assuming any capability is present.
+> made here until there is evidence to support it. At the time of writing the
+> domain has money and accounts; postings, transactions and the ledger itself do
+> not exist. The status table below is the source of truth — please read it
+> before assuming any capability is present.
 
 ---
 
@@ -49,6 +50,14 @@ them is a compile error rather than a runtime incident.
 - `Money` — exact amounts as `i64` minor units + currency, with fallible
   arithmetic that surfaces overflow and currency mismatch instead of wrapping
   or converting implicitly
+- `Direction` — `Debit`/`Credit` as a direction, never a sign on the amount
+- `AccountId` — UUIDv7 newtype, so identifiers can be minted without
+  coordination and still sort near each other in an index
+  ([ADR 003](docs/adr/003-account-identity.md))
+- `AccountKind` — the five kinds, with the debit/credit sign rule derived from
+  the accounting equation rather than written out as a truth table
+- `Account` — identity, kind and a currency fixed at opening; applies the sign
+  rule and rejects amounts in any other currency
 
 ### Experimental
 
@@ -112,7 +121,7 @@ Invariant 3 is referential and requires the ledger as context.
 ```
 src/lib.rs        crate root
 src/domain.rs     the pure financial domain
-src/domain/       currency, money (accounts and transactions to follow)
+src/domain/       currency, money, direction, account (transactions to follow)
 docs/adr/         decision records
 ```
 
@@ -142,6 +151,7 @@ cargo fmt --all --check
 - `docs/adr/` — architecture decision records:
   - [001 — Money representation](docs/adr/001-money-representation.md)
   - [002 — Crate and module layout](docs/adr/002-crate-and-module-layout.md)
+  - [003 — Account identity](docs/adr/003-account-identity.md)
 
 ADRs are written only for decisions actually made. There are no placeholder
 records for future phases.
