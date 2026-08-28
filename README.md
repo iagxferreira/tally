@@ -6,7 +6,7 @@
 >
 > Tally is **not production-ready**, and no claim of production-readiness will be
 > made here until there is evidence to support it. At the time of writing the
-> domain has money and accounts; postings, transactions and the ledger itself do
+> domain has money, accounts and postings; transactions and the ledger itself do
 > not exist. The status table below is the source of truth — please read it
 > before assuming any capability is present.
 
@@ -59,6 +59,9 @@ them is a compile error rather than a runtime incident.
 - `Account` — identity, kind and a currency fixed at opening; applies the sign
   rule and rejects amounts in any other currency
   ([ADR 004](docs/adr/004-single-currency-accounts.md))
+- `Posting` — one leg of a movement, minted only through `Account::post`, so a
+  posting is always strictly positive and always in its account's currency
+  ([ADR 005](docs/adr/005-posting-construction.md))
 
 ### Experimental
 
@@ -122,7 +125,8 @@ Invariant 3 is referential and requires the ledger as context.
 ```
 src/lib.rs        crate root
 src/domain.rs     the pure financial domain
-src/domain/       currency, money, direction, account (transactions to follow)
+src/domain/       currency, money, direction, account, posting
+                  (transactions and the ledger to follow)
 docs/adr/         decision records
 ```
 
@@ -154,6 +158,7 @@ cargo fmt --all --check
   - [002 — Crate and module layout](docs/adr/002-crate-and-module-layout.md)
   - [003 — Account identity](docs/adr/003-account-identity.md)
   - [004 — Single-currency accounts](docs/adr/004-single-currency-accounts.md)
+  - [005 — Posting construction](docs/adr/005-posting-construction.md)
 
 ADRs are written only for decisions actually made. There are no placeholder
 records for future phases.
