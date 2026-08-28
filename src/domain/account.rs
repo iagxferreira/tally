@@ -7,6 +7,7 @@ use uuid::Uuid;
 use super::currency::Currency;
 use super::direction::Direction;
 use super::money::{Money, MoneyError};
+use super::posting::{Posting, PostingError};
 
 /// The identity of an account within a ledger.
 ///
@@ -280,6 +281,21 @@ impl Account {
         Money::zero(self.currency)
     }
 
+    /// Mints a posting against this account.
+    ///
+    /// This is the only way to construct a [`Posting`], which is what makes
+    /// the currency check unskippable: you cannot produce a posting without
+    /// the account in hand, and the account's currency is fixed at opening.
+    ///
+    /// # Errors
+    ///
+    /// - [`PostingError::CurrencyMismatch`] if `amount` is not in this
+    ///   account's currency.
+    /// - [`PostingError::NonPositiveAmount`] if `amount` is zero or negative.
+    ///   Direction is carried by `direction`, never by the sign.
+    pub fn post(&self, direction: Direction, amount: Money) -> Result<Posting, PostingError> {
+        Posting::new(self, direction, amount)
+    }
     /// The signed contribution a posting makes to this account's balance.
     ///
     /// This is [`AccountKind::balance_effect`] plus the currency check that the

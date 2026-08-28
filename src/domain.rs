@@ -6,15 +6,17 @@
 //!
 //! Currently modelled: currencies, exact monetary amounts, posting direction,
 //! and accounts — their identity, their classification, and the sign rule that
-//! determines how postings affect their balances. Postings, transactions and
-//! the ledger do not exist yet.
+//! determines how postings affect their balances — and postings, the individual
+//! legs of a movement. Transactions and the ledger do not exist yet.
 
 mod account;
 mod currency;
 mod direction;
 mod money;
+mod posting;
 
 pub use account::{Account, AccountError, AccountId, AccountKind};
 pub use currency::Currency;
 pub use direction::Direction;
 pub use money::{Money, MoneyError};
+pub use posting::{Posting, PostingError};
