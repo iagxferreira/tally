@@ -4,6 +4,7 @@ use core::fmt;
 
 use uuid::Uuid;
 
+use super::currency::Currency;
 use super::direction::Direction;
 use super::money::{Money, MoneyError};
 
@@ -180,9 +181,154 @@ impl fmt::Display for AccountKind {
     }
 }
 
+/// An account in the chart of accounts.
+///
+/// An account is the first type in the domain with *identity* rather than
+/// pure value semantics: two accounts with the same name and kind are two
+/// different accounts. It is therefore not `Copy`, and it is compared by all
+/// of its fields only because tests want that — never treat structural
+/// equality as identity. Identity is [`Account::id`].
+///
+/// # Denominated in exactly one currency
+///
+/// The currency is fixed when the account is opened and cannot change. An
+/// entity that holds both dollars and euros holds *two* accounts, which is how
+/// core banking ledgers are actually built.
+///
+/// The consequence is that a balance is always a single [`Money`], never a map
+/// from currency to amount, and that "what is the balance of this account" is
+/// answerable without further qualification. It also pushes the per-currency
+/// half of double-entry balancing down to a place where it can be checked
+/// early: an amount in the wrong currency is rejected by
+/// [`Account::balance_effect`] rather than surviving into a transaction.
+///
+/// # What this type does not enforce
+///
+/// That a posting references an account which *exists* is a referential
+/// invariant. It needs the chart of accounts as context, so it belongs to the
+/// ledger, not here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Account {
+    id: AccountId,
+    kind: AccountKind,
+    currency: Currency,
+    name: String,
+}
+
+impl Account {
+    /// Opens a new account, minting its identity.
+    ///
+    /// The name is trimmed of surrounding whitespace and must not be empty
+    /// once trimmed: an unnamed row in a chart of accounts is an operational
+    /// hazard, not a valid account.
+    ///
+    /// There is deliberately no constructor that accepts an existing
+    /// [`AccountId`]. Reconstructing an account from storage is a boundary
+    /// concern, and the boundary does not exist yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AccountError::EmptyName`] if `name` is empty or only
+    /// whitespace.
+    pub fn open(kind: AccountKind, currency: Currency, name: &str) -> Result<Self, AccountError> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(AccountError::EmptyName);
+        }
+
+        Ok(Self {
+            id: AccountId::generate(),
+            kind,
+            currency,
+            name: name.to_owned(),
+        })
+    }
+
+    /// The account's identity.
+    #[must_use]
+    pub const fn id(&self) -> AccountId {
+        self.id
+    }
+
+    /// The account's classification, which fixes its normal balance side.
+    #[must_use]
+    pub const fn kind(&self) -> AccountKind {
+        self.kind
+    }
+
+    /// The currency this account is denominated in, fixed at opening.
+    #[must_use]
+    pub const fn currency(&self) -> Currency {
+        self.currency
+    }
+
+    /// The account's human-readable name.
+    ///
+    /// Borrowed rather than cloned: the caller almost always wants to read or
+    /// format it, and an owned `String` would allocate on every read.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// An empty balance in this account's currency.
+    ///
+    /// This is the seed for folding postings into a balance, and the reason a
+    /// balance never needs a currency argument.
+    #[must_use]
+    pub const fn zero_balance(&self) -> Money {
+        Money::zero(self.currency)
+    }
+
+    /// The signed contribution a posting makes to this account's balance.
+    ///
+    /// This is [`AccountKind::balance_effect`] plus the currency check that the
+    /// single-currency decision makes possible.
+    ///
+    /// # Errors
+    ///
+    /// - [`MoneyError::CurrencyMismatch`] if `amount` is not in this account's
+    ///   currency. Tally never converts implicitly.
+    /// - [`MoneyError::Overflow`] if the amount must be negated but is not
+    ///   representable negated.
+    pub fn balance_effect(&self, direction: Direction, amount: Money) -> Result<Money, MoneyError> {
+        if amount.currency() != self.currency {
+            return Err(MoneyError::CurrencyMismatch {
+                left: self.currency,
+                right: amount.currency(),
+            });
+        }
+
+        self.kind.balance_effect(direction, amount)
+    }
+}
+
+/// Ways opening an account can fail.
+///
+/// Separate from [`MoneyError`] because it describes construction, not
+/// arithmetic. Operations *on* an account that fail monetarily keep reporting
+/// [`MoneyError`], so a caller doing arithmetic does not have to widen its
+/// error type to include naming rules.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum AccountError {
+    /// The name was empty, or contained only whitespace.
+    EmptyName,
+}
+
+impl fmt::Display for AccountError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EmptyName => f.write_str("account name must not be empty"),
+        }
+    }
+}
+
+impl core::error::Error for AccountError {}
+
 #[cfg(test)]
 mod tests {
-    use super::{AccountId, AccountKind};
+    use super::{Account, AccountError, AccountId, AccountKind};
     use crate::domain::{Currency, Direction, Money, MoneyError};
     use uuid::Uuid;
 
@@ -324,6 +470,89 @@ mod tests {
         assert_eq!(
             AccountKind::Asset.balance_effect(Direction::Credit, usd(i64::MIN)),
             Err(MoneyError::Overflow)
+        );
+    }
+
+    #[test]
+    fn an_opened_account_keeps_what_it_was_opened_with() {
+        let account = Account::open(AccountKind::Liability, Currency::Brl, "customer 42").unwrap();
+
+        assert_eq!(account.kind(), AccountKind::Liability);
+        assert_eq!(account.currency(), Currency::Brl);
+        assert_eq!(account.name(), "customer 42");
+    }
+
+    #[test]
+    fn opening_mints_a_distinct_identity() {
+        let a = Account::open(AccountKind::Asset, Currency::Usd, "cash").unwrap();
+        let b = Account::open(AccountKind::Asset, Currency::Usd, "cash").unwrap();
+
+        // Same kind, same currency, same name: still two different accounts.
+        assert_ne!(a.id(), b.id());
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn names_are_trimmed() {
+        let account = Account::open(AccountKind::Expense, Currency::Usd, "  fees  ").unwrap();
+        assert_eq!(account.name(), "fees");
+    }
+
+    #[test]
+    fn an_unnamed_account_cannot_be_opened() {
+        for name in ["", "   ", "\t\n"] {
+            assert_eq!(
+                Account::open(AccountKind::Asset, Currency::Usd, name),
+                Err(AccountError::EmptyName),
+                "{name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_empty_balance_is_in_the_accounts_currency() {
+        let account = Account::open(AccountKind::Asset, Currency::Jpy, "vault").unwrap();
+        let zero = account.zero_balance();
+
+        assert!(zero.is_zero());
+        assert_eq!(zero.currency(), Currency::Jpy);
+    }
+
+    #[test]
+    fn an_account_applies_its_kinds_sign_rule() {
+        let cash = Account::open(AccountKind::Asset, Currency::Usd, "cash").unwrap();
+
+        assert_eq!(
+            cash.balance_effect(Direction::Debit, usd(250)).unwrap(),
+            usd(250)
+        );
+        assert_eq!(
+            cash.balance_effect(Direction::Credit, usd(250)).unwrap(),
+            usd(-250)
+        );
+    }
+
+    #[test]
+    fn an_account_rejects_an_amount_in_another_currency() {
+        // The point of fixing the currency at opening: the mismatch is caught
+        // here, not after it has reached a transaction.
+        let account = Account::open(AccountKind::Asset, Currency::Usd, "cash").unwrap();
+        let euros = Money::from_minor_units(100, Currency::Eur);
+
+        assert_eq!(
+            account.balance_effect(Direction::Debit, euros),
+            Err(MoneyError::CurrencyMismatch {
+                left: Currency::Usd,
+                right: Currency::Eur,
+            })
+        );
+    }
+
+    #[test]
+    fn account_errors_describe_themselves() {
+        assert_eq!(
+            AccountError::EmptyName.to_string(),
+            "account name must not be empty"
         );
     }
 
