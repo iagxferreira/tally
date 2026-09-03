@@ -2,6 +2,7 @@ package tally.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.InstanceOfAssertFactories.throwable;
 
 import java.math.BigInteger;
 import org.junit.jupiter.api.DisplayName;
@@ -9,9 +10,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * These test the invariants ADR 001 and ADR 007 exist to protect, not the
- * shape of the implementation: exactness, refusal to mix currencies, and
- * overflow surfacing as a value rather than wrapping.
+ * These test the invariants ADR 001, ADR 008 and ADR 009 exist to protect, not
+ * the shape of the implementation: exactness, refusal to mix currencies, and an
+ * unbounded range that cannot wrap.
  */
 class MoneyTest {
 
@@ -21,17 +22,30 @@ class MoneyTest {
 
         @Test
         void addsAmountsOfTheSameCurrency() {
-            Money sum = Money.of(150, Currency.USD).add(Money.of(275, Currency.USD)).orElseThrow();
+            Money sum = Money.of(150, Currency.USD).add(Money.of(275, Currency.USD));
 
             assertThat(sum).isEqualTo(Money.of(425, Currency.USD));
         }
 
         @Test
         void refusesToAddDifferentCurrencies() {
-            Result<Money, MoneyError> result = Money.of(100, Currency.USD).add(Money.of(100, Currency.EUR));
+            assertThatThrownBy(() -> Money.of(100, Currency.USD).add(Money.of(100, Currency.EUR)))
+                    .isInstanceOf(CurrencyMismatchException.class)
+                    .asInstanceOf(throwable(CurrencyMismatchException.class))
+                    .satisfies(mismatch -> {
+                        assertThat(mismatch.left()).isEqualTo(Currency.USD);
+                        assertThat(mismatch.right()).isEqualTo(Currency.EUR);
+                    });
+        }
 
-            assertThat(result).isEqualTo(
-                    Result.err(new MoneyError.CurrencyMismatch(Currency.USD, Currency.EUR)));
+        @Test
+        @DisplayName("amounts compose with ordinary chaining")
+        void chainsWithoutCeremony() {
+            Money total = Money.of(100, Currency.USD)
+                    .add(Money.of(250, Currency.USD))
+                    .add(Money.of(75, Currency.USD));
+
+            assertThat(total).isEqualTo(Money.of(425, Currency.USD));
         }
 
         @Test
@@ -39,7 +53,7 @@ class MoneyTest {
         void isNotBoundedByLong() {
             Money max = Money.of(Long.MAX_VALUE, Currency.USD);
 
-            Money sum = max.add(Money.of(1, Currency.USD)).orElseThrow();
+            Money sum = max.add(Money.of(1, Currency.USD));
 
             assertThat(sum.minorUnits())
                     .isEqualTo(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE));
@@ -53,7 +67,7 @@ class MoneyTest {
             Money large = Money.of(Long.MAX_VALUE, Currency.USD);
 
             for (int i = 0; i < 1_000; i++) {
-                running = running.add(large).orElseThrow();
+                running = running.add(large);
             }
 
             assertThat(running.minorUnits())
@@ -68,7 +82,7 @@ class MoneyTest {
 
         @Test
         void producesNegativeAmounts() {
-            Money result = Money.of(100, Currency.USD).subtract(Money.of(250, Currency.USD)).orElseThrow();
+            Money result = Money.of(100, Currency.USD).subtract(Money.of(250, Currency.USD));
 
             assertThat(result).isEqualTo(Money.of(-150, Currency.USD));
             assertThat(result.isNegative()).isTrue();
@@ -76,11 +90,10 @@ class MoneyTest {
 
         @Test
         void refusesToSubtractDifferentCurrencies() {
-            Result<Money, MoneyError> result =
-                    Money.of(100, Currency.JPY).subtract(Money.of(100, Currency.KWD));
-
-            assertThat(result).isEqualTo(
-                    Result.err(new MoneyError.CurrencyMismatch(Currency.JPY, Currency.KWD)));
+            assertThatThrownBy(() -> Money.of(100, Currency.JPY).subtract(Money.of(100, Currency.KWD)))
+                    .isInstanceOf(CurrencyMismatchException.class)
+                    .hasMessageContaining("JPY")
+                    .hasMessageContaining("KWD");
         }
 
         @Test
@@ -88,7 +101,7 @@ class MoneyTest {
         void isNotBoundedBelowByLong() {
             Money min = Money.of(Long.MIN_VALUE, Currency.USD);
 
-            Money result = min.subtract(Money.of(1, Currency.USD)).orElseThrow();
+            Money result = min.subtract(Money.of(1, Currency.USD));
 
             assertThat(result.minorUnits())
                     .isEqualTo(BigInteger.valueOf(Long.MIN_VALUE).subtract(BigInteger.ONE));
@@ -165,7 +178,8 @@ class MoneyTest {
         @DisplayName("comparing across currencies is a programmer error, not a domain outcome")
         void refusesToOrderDifferentCurrencies() {
             assertThatThrownBy(() -> Money.of(100, Currency.USD).compareTo(Money.of(100, Currency.JPY)))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(CurrencyMismatchException.class)
+                    .isInstanceOf(DomainException.class)
                     .hasMessageContaining("USD")
                     .hasMessageContaining("JPY");
         }

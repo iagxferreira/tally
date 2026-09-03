@@ -34,12 +34,14 @@ import java.util.Objects;
  * <p>{@link BigInteger} is unbounded, so addition, subtraction and negation
  * cannot overflow. That deletes an entire class of failure that a {@code long}
  * representation had to carry: with {@code long}, every arithmetic call had to
- * return a result that might be an overflow error, and a raw {@code +} that
- * slipped past review would wrap silently into a plausible, wrong balance.
+ * account for an overflow error, and a raw {@code +} that slipped past review
+ * would wrap silently into a plausible, wrong balance.
  *
- * <p>What remains is {@link #negate()}, which is now total and returns a
- * {@code Money} directly, and {@link #add(Money)} / {@link #subtract(Money)},
- * which can still fail for exactly one reason: the currencies differ.
+ * <p>The one remaining way arithmetic can fail is a currency mismatch, which
+ * raises {@link CurrencyMismatchException}. It is unchecked because a
+ * well-written caller does not add dollars to yen — that is a defect in the
+ * calling code, not a condition to recover from. Amounts therefore compose
+ * with ordinary chaining: {@code a.add(b).add(c)}.
  *
  * <p>The cost is an allocation per operation and the loss of primitive
  * comparison. That is accepted: correctness before performance, and optimising
@@ -79,14 +81,13 @@ public record Money(BigInteger minorUnits, Currency currency) implements Compara
     /**
      * This amount plus {@code other}.
      *
-     * @return the sum, or {@link MoneyError.CurrencyMismatch} if the currencies
-     *     differ. There is no overflow case: the representation is unbounded.
+     * <p>There is no overflow case: the representation is unbounded.
+     *
+     * @throws CurrencyMismatchException if the currencies differ
      */
-    public Result<Money, MoneyError> add(Money other) {
-        if (currency != other.currency) {
-            return Result.err(new MoneyError.CurrencyMismatch(currency, other.currency));
-        }
-        return Result.ok(new Money(minorUnits.add(other.minorUnits), currency));
+    public Money add(Money other) {
+        requireSameCurrency(other);
+        return new Money(minorUnits.add(other.minorUnits), currency);
     }
 
     /**
@@ -97,14 +98,17 @@ public record Money(BigInteger minorUnits, Currency currency) implements Compara
      * is {@code Posting} that requires strict positivity, because there
      * direction is carried by {@code Direction} rather than by a sign.
      *
-     * @return the difference, or {@link MoneyError.CurrencyMismatch} if the
-     *     currencies differ
+     * @throws CurrencyMismatchException if the currencies differ
      */
-    public Result<Money, MoneyError> subtract(Money other) {
+    public Money subtract(Money other) {
+        requireSameCurrency(other);
+        return new Money(minorUnits.subtract(other.minorUnits), currency);
+    }
+
+    private void requireSameCurrency(Money other) {
         if (currency != other.currency) {
-            return Result.err(new MoneyError.CurrencyMismatch(currency, other.currency));
+            throw new CurrencyMismatchException(currency, other.currency);
         }
-        return Result.ok(new Money(minorUnits.subtract(other.minorUnits), currency));
     }
 
     /**
@@ -137,18 +141,13 @@ public record Money(BigInteger minorUnits, Currency currency) implements Compara
     /**
      * Orders two amounts of the same currency.
      *
-     * @throws IllegalArgumentException if the currencies differ. Unlike
-     *     arithmetic, ordering has no meaningful failure value to return, and
-     *     comparing dollars to yen is a programmer error rather than a domain
-     *     outcome. {@link Comparable} also fixes the signature, so a
-     *     {@code Result} is not available here.
+     * @throws CurrencyMismatchException if the currencies differ. Ordering
+     *     dollars against yen is meaningless for the same reason adding them
+     *     is, so it fails the same way.
      */
     @Override
     public int compareTo(Money other) {
-        if (currency != other.currency) {
-            throw new IllegalArgumentException(
-                    "cannot order " + currency.code() + " against " + other.currency.code());
-        }
+        requireSameCurrency(other);
         return minorUnits.compareTo(other.minorUnits);
     }
 
