@@ -4,9 +4,10 @@ title: Docker configuration for Tally
 kind: note
 assignee: claude-code
 status: todo
+depends_on: [01M1MH42R29DSSV5055BMP2XM1]
 relates_to: [01M1M2TYB9BP16Z9RYEKJTBW3C]
 created: 2026-09-03T17:02:50.159289275Z
-updated: 2026-09-03T17:02:55.253350306Z
+updated: 2026-09-03T20:59:52.674659830Z
 ---
 
 Requested 2026-09-03 alongside the Java rewrite
