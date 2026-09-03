@@ -2,11 +2,11 @@
 id: 01M1MH3SXQ5TBJ434B2NAWA3S2
 title: Property tests for the double-entry invariants
 kind: note
-assignee: claude-code
-status: todo
+assignee: opencode
+status: doing
 relates_to: [01M1M2WS9DWCXM34B3KG63HB86]
 created: 2026-09-03T20:59:36.247145650Z
-updated: 2026-09-03T20:59:51.078966253Z
+updated: 2026-09-03T23:21:36.278621066Z
 ---
 
 Split out of [[Transaction — enforce the double-entry balance invariant]] on
@@ -53,3 +53,11 @@ before adding, and record why.
 
 **Done when:** the accounting equation and the reversal property are covered by
 generated inputs, not chosen ones.
+
+## Decision, 2026-09-03
+
+Use plain JUnit 5 randomized loops rather than adding jqwik. The project keeps its dependency surface small, and the generated cases can remain explicit and readable in the existing test style.
+
+## Compiler feedback, 2026-09-03
+
+The first test draft failed compilation for two ordinary Java reasons: a hexadecimal `Random` seed without `L` was treated as an oversized `int`, and a lambda could not capture `credit` after reassignment because it was not effectively final. The fix was to use a `long` seed and copy the adjusted value to `unequalCredit` before capture. This was a test-only correction; no production code was added.
