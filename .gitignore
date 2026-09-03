@@ -1,4 +1,10 @@
-/target
-**/*.rs.bk
-*.pdb
+# Gradle
+/build/
+/.gradle/
+
+# IDE
+/.idea/
+*.iml
+/.vscode/
+
 .env
