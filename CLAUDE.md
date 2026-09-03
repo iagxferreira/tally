@@ -56,11 +56,29 @@ that reason. Write Java that reads like Java.
 
 ```
 src/main/java/tally/domain/   pure domain — no HTTP, JDBC, Jackson, frameworks
+                money/        Currency, Money
+                account/      Account, AccountId, AccountKind, Direction, Posting
+                ledger/       Transaction, TransactionId, Ledger
+                failure/      DomainException and its permitted subclasses
 src/main/java/tally/core/     composition over the domain
-src/test/java/                tests
+src/test/java/                tests, mirroring the same folders
 build.gradle.kts              one module
 mise.toml                     pinned JDK and Gradle
 ```
+
+**Those folders are not packages.** Every file under `src/main/java/tally/domain`
+declares `package tally.domain`, whatever directory it sits in. The folders make
+the domain navigable; the single package is what keeps two invariants working,
+and both would break if the folders became real subpackages:
+
+- `Posting`'s constructor and `flip()` are package-private, so only `Account`
+  and `Transaction` can mint a posting. Subpackages would force them public.
+- `DomainException` is `sealed`, and outside a named module a sealed type's
+  permitted subclasses must share its package.
+
+An IDE will report the directories as mismatched and offer to "fix" it. Refuse:
+accepting would quietly turn the folders into packages and delete both
+guarantees. Do not add `module-info.java` to work around this.
 
 Tally is a **single Gradle module**, not a module tree. Do not introduce
 `:tally-domain` / `:tally-core` / `:tally-app`, and do not create modules in
