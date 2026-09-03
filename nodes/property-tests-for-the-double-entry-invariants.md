@@ -6,7 +6,7 @@ assignee: opencode
 status: doing
 relates_to: [01M1M2WS9DWCXM34B3KG63HB86]
 created: 2026-09-03T20:59:36.247145650Z
-updated: 2026-09-03T23:21:36.278621066Z
+updated: 2026-09-03T23:23:03.029173804Z
 ---
 
 Split out of [[Transaction — enforce the double-entry balance invariant]] on
@@ -61,3 +61,7 @@ Use plain JUnit 5 randomized loops rather than adding jqwik. The project keeps i
 ## Compiler feedback, 2026-09-03
 
 The first test draft failed compilation for two ordinary Java reasons: a hexadecimal `Random` seed without `L` was treated as an oversized `int`, and a lambda could not capture `credit` after reassignment because it was not effectively final. The fix was to use a `long` seed and copy the adjusted value to `unequalCredit` before capture. This was a test-only correction; no production code was added.
+
+## Commits, 2026-09-03
+
+The first JUnit randomized increment was committed as `a435404 test(core): add randomized invariant coverage`. The task remains `doing` because accounting-equation and journal-fold properties are still outstanding. Full `./gradlew build` passed after the commit.
