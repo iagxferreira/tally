@@ -67,6 +67,10 @@ violating them fails to compile rather than failing in production.
 
 53 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
 
+Invariant 1 — no floating point — is currently upheld by review rather than by
+the build. Java has no equivalent of the crate-wide lint the Rust version used,
+and no replacement has been adopted yet.
+
 ### Experimental
 
 Nothing.
@@ -146,8 +150,8 @@ Tally is deliberately **one Gradle module**. Splitting the domain into its own
 module would make its independence from infrastructure a compile error rather
 than a convention, but there is no infrastructure to exclude yet, and the split
 is a cheap mechanical refactor when there is. The boundary is currently upheld
-by convention and review; ArchUnit is present to enforce it mechanically, but
-those rules have not been written yet.
+by convention and review rather than by tooling: with `tally.core` still empty,
+a rule forbidding the domain from importing it would have nothing to forbid.
 
 ## Getting started
 

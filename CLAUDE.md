@@ -69,9 +69,11 @@ scaffolding, dependency injection, or a framework; none of it is earned.
 
 The domain's independence from infrastructure is therefore a convention here,
 not a compile error. Guard it deliberately: nothing under `tally.domain` may
-import an infrastructure dependency. ArchUnit is on the test classpath to
-enforce this mechanically, but **the rules are not written yet** — until they
-are, the boundary is upheld by review alone. When the
+import an infrastructure dependency. **This is upheld by review, not by the
+build.** An architecture-test library was considered and deliberately not
+adopted: with `tally.core` still empty there is nothing for such a rule to
+forbid, and unearned machinery is what principle 9 exists to prevent. Revisit
+when `tally.core` has contents. When the
 first such dependency is added (likely a JDBC driver in Phase 2), stop and
 revisit the module-layout decision — that is the trigger for extracting the
 domain into its own module, and it is a mechanical refactor.
@@ -108,14 +110,17 @@ Every increment must pass:
 
 That runs compilation with `-Xlint:all -Werror`, Error Prone, and the tests.
 
-The Rust version had a crate-wide lint policy denying floating-point arithmetic
-outright. Java has no equivalent, and the intended replacement — ArchUnit rules
-asserting that no domain class references `float` or `double` and that
-`tally.domain` depends on nothing in `tally.core` — **is not yet written**.
-Until it is, principle 2 is enforced by review, not by the build. When those
-rules land they run as tests and are load-bearing: a disabled ArchUnit rule
-silently stops enforcing an invariant, so do not disable one to make a build
-pass.
+**Principle 2 is not enforced mechanically.** The Rust version had a crate-wide
+lint denying floating-point arithmetic outright; Java has no equivalent, and no
+replacement has been adopted. An architecture-test library would catch `float`
+and `double` in fields and signatures — reflection alone cannot see inside
+method bodies, and neither reliably catches intermediate `double` arithmetic
+that is rounded before it is returned. It was judged unearned while the domain
+is this small.
+
+So: **no floating point in `tally.domain`, enforced by review.** If you are
+reviewing a change here, that is your job, not the build's. Revisit the
+decision when the domain grows or when a near-miss actually happens.
 
 Java has no equivalent of Rust's `overflow-checks`; `long` wraps silently in
 every build. This is why `Money` holds a `BigInteger`.
