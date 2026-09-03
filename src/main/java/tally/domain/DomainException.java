@@ -35,7 +35,10 @@ public sealed abstract class DomainException extends RuntimeException
         permits CurrencyMismatchException,
                 NonPositiveAmountException,
                 UnbalancedTransactionException,
-                MalformedTransactionException {
+                MalformedTransactionException,
+                UnknownAccountException,
+                UnknownTransactionException,
+                DuplicateTransactionException {
 
     private static final long serialVersionUID = 1L;
 

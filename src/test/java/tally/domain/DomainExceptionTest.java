@@ -28,6 +28,12 @@ class DomainExceptionTest {
                 "unbalanced by " + unbalanced.imbalance();
             case MalformedTransactionException malformed ->
                 "malformed: " + malformed.getMessage();
+            case UnknownAccountException unknownAccount ->
+                "unknown account " + unknownAccount.account();
+            case UnknownTransactionException unknownTransaction ->
+                "unknown transaction " + unknownTransaction.transaction();
+            case DuplicateTransactionException duplicate ->
+                "duplicate " + duplicate.transaction();
         };
     }
 
@@ -61,6 +67,24 @@ class DomainExceptionTest {
                 new UnbalancedTransactionException(Money.of(100, Currency.USD));
 
         assertThat(describe(unbalanced)).isEqualTo("unbalanced by 1.00 USD");
+    }
+
+    @Test
+    @DisplayName("the referential failures were handled because the compiler demanded it")
+    void handlesTheLedgerFailures() {
+        AccountId account = AccountId.mint();
+
+        assertThat(describe(new UnknownAccountException(account)))
+                .isEqualTo("unknown account " + account);
+    }
+
+    @Test
+    @DisplayName("every domain failure is reachable through one catch")
+    void everyFailureIsADomainException() {
+        // Four rounds of new failure types, and each one broke this switch
+        // until it was accounted for. Under an open hierarchy each would have
+        // fallen silently through a default branch instead.
+        assertThat(DomainException.class.getPermittedSubclasses()).hasSize(7);
     }
 
     @Test
