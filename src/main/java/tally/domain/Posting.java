@@ -77,6 +77,26 @@ public final class Posting {
     }
 
     /**
+     * This posting on the opposite side, with the same account and amount.
+     *
+     * <p>Package-private, and the only construction path besides
+     * {@link Account#post}. It exists so that {@link Transaction#reverse} can
+     * build a correcting entry without reaching for the constructor itself:
+     * a reversal holds only {@link AccountId}s, never {@link Account} objects,
+     * so it genuinely cannot go back through {@code Account.post}.
+     *
+     * <p>Asking a posting to flip itself keeps construction in one place. The
+     * alternative — {@code Transaction} calling the constructor directly —
+     * compiled perfectly well, because package privacy cannot stop anything
+     * inside {@code tally.domain}, and that is exactly the weakening ADR 005
+     * warned about. It is worth noticing that the first thing to walk through
+     * that door was this codebase, hours after the warning was written.
+     */
+    Posting flip() {
+        return new Posting(account, direction.opposite(), amount);
+    }
+
+    /**
      * The signed contribution this posting makes to the balance of an account
      * of the given kind.
      *

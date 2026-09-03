@@ -137,10 +137,7 @@ public final class Transaction {
      */
     public static Transaction reverse(Clock clock, Transaction original) {
         Objects.requireNonNull(original, "original");
-        List<Posting> flipped = original.postings.stream()
-                .map(posting -> new Posting(
-                        posting.account(), posting.direction().opposite(), posting.amount()))
-                .toList();
+        List<Posting> flipped = original.postings.stream().map(Posting::flip).toList();
         return build(clock, flipped, original.id);
     }
 
