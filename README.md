@@ -1,14 +1,21 @@
 # Tally
 
-**Tally is a double-entry financial ledger written in Rust, built to explore correctness, consistency, concurrency, and failure handling in financial systems.**
+**Tally is a double-entry financial ledger written in Java, built to explore
+correctness, consistency, concurrency, and failure handling in financial
+systems.**
 
 > ### Status: early development
 >
-> Tally is **not production-ready**, and no claim of production-readiness will be
-> made here until there is evidence to support it. At the time of writing the
-> domain has money, accounts and postings; transactions and the ledger itself do
-> not exist. The status table below is the source of truth — please read it
-> before assuming any capability is present.
+> Tally is **not production-ready**, and no claim of production-readiness will
+> be made here until there is evidence to support it. At the time of writing
+> the domain has money, currencies, directions, account kinds and account
+> identity. **Accounts, postings, transactions and the ledger itself do not
+> exist yet** — which means Tally cannot currently record a transaction. The
+> status section below is the source of truth; please read it before assuming
+> any capability is present.
+>
+> Tally was originally written in Rust. It was rebuilt in Java in September
+> 2026; the Rust implementation remains in git history.
 
 ---
 
@@ -30,9 +37,10 @@ duplicate itself? What does "exactly once" actually mean when a broker is
 involved? How do you detect that your ledger and your payment processor have
 silently diverged?
 
-Rust is used because its ownership model, type system, and explicit error
-handling make it possible to encode financial invariants such that violating
-them is a compile error rather than a runtime incident.
+Java is used because the JVM is where this kind of system usually lives, and
+because its type system — sealed hierarchies, records, exhaustive pattern
+matching — can encode a useful share of the financial invariants such that
+violating them fails to compile rather than failing in production.
 
 ---
 
@@ -40,32 +48,33 @@ them is a compile error rather than a runtime incident.
 
 ### Implemented
 
-- Single crate (edition 2024), pinned toolchain, CI-ready lint policy
-- Lint policy that **denies floating-point arithmetic** crate-wide, and enables
-  integer overflow checks in release builds
-- A `domain` module holding the pure financial model, with no infrastructure
-  dependencies
-- `Currency` — closed enum carrying its ISO 4217 code and decimal scale
-  (all three real-world scales represented: JPY = 0, USD/EUR/GBP/BRL = 2, KWD = 3)
-- `Money` — exact amounts as `i64` minor units + currency, with fallible
-  arithmetic that surfaces overflow and currency mismatch instead of wrapping
-  or converting implicitly
-- `Direction` — `Debit`/`Credit` as a direction, never a sign on the amount
-- `AccountId` — UUIDv7 newtype, so identifiers can be minted without
-  coordination and still sort near each other in an index
-  ([ADR 003](docs/adr/003-account-identity.md))
-- `AccountKind` — the five kinds, with the debit/credit sign rule derived from
-  the accounting equation rather than written out as a truth table
-- `Account` — identity, kind and a currency fixed at opening; applies the sign
-  rule and rejects amounts in any other currency
-  ([ADR 004](docs/adr/004-single-currency-accounts.md))
-- `Posting` — one leg of a movement, minted only through `Account::post`, so a
-  posting is always strictly positive and always in its account's currency
-  ([ADR 005](docs/adr/005-posting-construction.md))
+- Single Gradle module, Java 25, toolchain pinned in `mise.toml` and again in
+  the Gradle toolchain block
+- `tally.domain` and `tally.core` separated by package. The domain has no
+  infrastructure dependencies
+- `Currency` — closed enum carrying its ISO 4217 code and decimal scale (all
+  three real-world scales: JPY = 0, USD/EUR/GBP/BRL = 2, KWD = 3)
+- `Money` — exact amounts as `BigInteger` **minor units** plus currency.
+  Unbounded, so arithmetic cannot overflow; refuses to mix currencies and never
+  converts implicitly
+- `Direction` — `DEBIT`/`CREDIT` as a side, never a sign on the amount
+- `AccountKind` — the five kinds, with the debit/credit sign rule *derived from
+  the accounting equation* rather than tabulated
+- `AccountId` — UUIDv7 record, so identifiers are minted without coordination
+  and still sort near each other in an index. Rejects any non-v7 value
+- `DomainException` — sealed hierarchy, so a handler switching over domain
+  failures is checked for exhaustiveness and needs no `default` branch
+
+53 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
 
 ### Experimental
 
-Nothing yet.
+Nothing.
+
+### Not yet built
+
+`Account`, `Posting`, `Transaction` and `Ledger` — that is, everything that
+would let Tally actually record a movement of money. This is the current work.
 
 ### Planned
 
@@ -74,14 +83,16 @@ until earlier ones are solid.
 
 | Phase | Scope |
 |---|---|
-| 1 | Domain: accounts, postings, transactions, double-entry validation, in-memory ledger, property tests |
+| 1 | Domain: accounts, postings, transactions, double-entry validation, in-memory ledger |
 | 2 | Persistence: PostgreSQL, isolation levels, concurrent posting, immutable journal |
-| 3 | API: async HTTP over Tokio, with the domain kept free of HTTP types |
+| 3 | API: HTTP, with the domain kept free of HTTP types |
 | 4 | Idempotency: safe retries of financial operations |
 | 5 | Events: transactional outbox, delivery semantics stated precisely |
 | 6 | Reconciliation: detecting divergence against an external processor |
 | 7 | Production engineering: tracing, metrics, health checks, failure injection |
 | 8 | Performance: measured, never assumed |
+
+Phase 1 is in progress. Nothing beyond it has been started.
 
 ---
 
@@ -93,7 +104,7 @@ These matter more than any API surface.
 2. A transaction contains at least two postings.
 3. Every posting references an account that exists.
 4. Posting amounts are strictly positive — direction is carried by
-   `Debit`/`Credit`, never by the sign of the number.
+   `DEBIT`/`CREDIT`, never by the sign of the number.
 5. For each currency within a transaction, `sum(debits) == sum(credits)`.
    Multi-currency transactions balance **per currency**; there is no implicit
    exchange rate.
@@ -102,8 +113,9 @@ These matter more than any API surface.
 7. The journal is append-only.
 8. Balances are derived from postings, not stored as independent truth.
 
-Invariants 1, 2, 4 and 5 are intrinsic and are enforced by construction.
-Invariant 3 is referential and requires the ledger as context.
+Invariant 1 is enforced today. Invariants 2, 4, 5, 6, 7 and 8 belong to types
+that do not exist yet. Invariant 3 is referential and requires the ledger as
+context, so it cannot be enforced by construction at all.
 
 ---
 
@@ -115,7 +127,7 @@ Invariant 3 is referential and requires the ledger as context.
 - Consistency guarantees are documented, not assumed.
 - Distributed-systems complexity must be earned. No technology is introduced to
   make the architecture look sophisticated.
-- Idiomatic Rust over clever Rust.
+- Idiomatic Java over clever Java.
 - Tests verify invariants, not implementation details.
 
 ---
@@ -123,42 +135,45 @@ Invariant 3 is referential and requires the ledger as context.
 ## Layout
 
 ```
-src/lib.rs        crate root
-src/domain.rs     the pure financial domain
-src/domain/       currency, money, direction, account, posting
-                  (transactions and the ledger to follow)
-docs/adr/         decision records
+src/main/java/tally/domain/   the pure financial model
+src/main/java/tally/core/     composition over the domain (empty so far)
+src/test/java/tally/domain/   tests
+build.gradle.kts              one module, no module tree
+mise.toml                     pinned JDK and Gradle
 ```
 
-Tally is deliberately a single crate. Splitting the domain into its own crate
-would make its independence from infrastructure a compile error rather than a
-convention, but there is no infrastructure to exclude yet, and the split is a
-cheap mechanical refactor when there is. See
-[ADR 002](docs/adr/002-crate-and-module-layout.md).
+Tally is deliberately **one Gradle module**. Splitting the domain into its own
+module would make its independence from infrastructure a compile error rather
+than a convention, but there is no infrastructure to exclude yet, and the split
+is a cheap mechanical refactor when there is. The boundary is currently upheld
+by convention and review; ArchUnit is present to enforce it mechanically, but
+those rules have not been written yet.
 
 ## Getting started
 
-Requires the toolchain pinned in `rust-toolchain.toml` (rustup will fetch it
-automatically).
+The toolchain is pinned with [mise](https://mise.jdx.dev); `mise install` will
+fetch the JDK and Gradle named in `mise.toml`. Note that a distribution's
+default `java` package is often a headless JRE with no compiler — pinning
+avoids that.
 
 ```sh
-cargo test --all
-cargo clippy --all-targets --all-features
-cargo fmt --all --check
+./gradlew build      # compile, run tests, run static analysis
+./gradlew test       # tests only
 ```
 
 ---
 
 ## Documentation
 
-- `docs/architecture.md` — system structure and boundaries *(not written yet)*
-- `docs/concepts/` — ledger and distributed-systems concepts *(not written yet)*
-- `docs/adr/` — architecture decision records:
-  - [001 — Money representation](docs/adr/001-money-representation.md)
-  - [002 — Crate and module layout](docs/adr/002-crate-and-module-layout.md)
-  - [003 — Account identity](docs/adr/003-account-identity.md)
-  - [004 — Single-currency accounts](docs/adr/004-single-currency-accounts.md)
-  - [005 — Posting construction](docs/adr/005-posting-construction.md)
+Architecture decision records live in the maintainer's
+[MindGraph](https://mindgraph.dev) vault rather than in this repository, as
+linked notes that record what each decision supersedes and what depends on it.
+They are not currently published here, so this README is the only design
+documentation a reader of this repository has.
+
+Decisions recorded so far cover money representation, module layout, account
+identity, single-currency accounts, posting construction, the move from Rust to
+Java, error handling, and the `BigInteger` representation.
 
 ADRs are written only for decisions actually made. There are no placeholder
 records for future phases.
