@@ -2,6 +2,11 @@
 /build/
 /.gradle/
 
+# MindGraph time-tracking telemetry: local state, not content.
+# The vault itself (nodes/) is committed; this file records who worked on which
+# node and for how long, and would churn on every task.
+/.mindgraph/
+
 # IDE
 /.idea/
 *.iml
