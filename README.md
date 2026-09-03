@@ -8,11 +8,12 @@ systems.**
 >
 > Tally is **not production-ready**, and no claim of production-readiness will
 > be made here until there is evidence to support it. At the time of writing
-> the domain has money, currencies, directions, account kinds and account
-> identity. **Accounts, postings, transactions and the ledger itself do not
-> exist yet** — which means Tally cannot currently record a transaction. The
-> status section below is the source of truth; please read it before assuming
-> any capability is present.
+> the in-memory domain is complete: Tally can open accounts, record balanced
+> transactions in an append-only journal, derive balances from it, and correct
+> mistakes by reversal. **There is no persistence, no API and no concurrency
+> support** — the ledger lives in memory, is not thread-safe, and disappears
+> when the process does. The status section below is the source of truth;
+> please read it before assuming any capability is present.
 >
 > Tally was originally written in Rust. It was rebuilt in Java in September
 > 2026; the Rust implementation remains in git history.
@@ -70,10 +71,13 @@ violating them fails to compile rather than failing in production.
   postings and `sum(debits) == sum(credits)`, with `transfer`, `split` and
   `reverse` factories over the same model
 - `TransactionId` — UUIDv7, like `AccountId`
+- `Ledger` — an append-only journal of posted transactions. Derives balances by
+  folding postings, refuses transactions naming unknown accounts, refuses
+  duplicates, and refuses a reversal of something never posted
 - `DomainException` — sealed hierarchy, so a handler switching over domain
   failures is checked for exhaustiveness and needs no `default` branch
 
-135 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
+155 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
 
 Invariant 1 — no floating point — is currently upheld by review rather than by
 the build. Java has no equivalent of the crate-wide lint the Rust version used,
@@ -85,9 +89,13 @@ Nothing.
 
 ### Not yet built
 
-`Ledger` — the append-only journal that stores posted transactions and derives
-balances from them. Until it exists Tally can *construct* a valid transaction
-but has nowhere to put it, so there are no balances. This is the current work.
+Everything outside the in-memory domain: persistence, an API, concurrent
+posting, idempotency, events, reconciliation. See the phase table below.
+
+The `Ledger` is **not thread-safe**, and deliberately so — the consistency
+guarantees of concurrent posting need a real storage model to answer, and
+guessing at a locking scheme before Phase 2 would be solving the problem before
+understanding it.
 
 ### Planned
 
@@ -96,7 +104,7 @@ until earlier ones are solid.
 
 | Phase | Scope |
 |---|---|
-| 1 | Domain: accounts, postings, transactions, double-entry validation, in-memory ledger |
+| 1 | ✅ Domain: accounts, postings, transactions, double-entry validation, in-memory ledger |
 | 2 | Persistence: PostgreSQL, isolation levels, concurrent posting, immutable journal |
 | 3 | API: HTTP, with the domain kept free of HTTP types |
 | 4 | Idempotency: safe retries of financial operations |
@@ -105,7 +113,7 @@ until earlier ones are solid.
 | 7 | Production engineering: tracing, metrics, health checks, failure injection |
 | 8 | Performance: measured, never assumed |
 
-Phase 1 is in progress. Nothing beyond it has been started.
+Phase 1 is complete. Nothing beyond it has been started.
 
 ---
 
@@ -128,11 +136,14 @@ These matter more than any API surface.
 7. The journal is append-only.
 8. Balances are derived from postings, not stored as independent truth.
 
-Invariants 1, 2, 4 and 5 are enforced today, and 6 is supported by
-`Transaction.reverse` producing a correcting entry rather than an edit.
-Invariants 7 and 8 belong to the `Ledger`, which does not exist yet. Invariant 3
-is referential and needs the ledger as context, so it cannot be enforced by
-construction at all.
+**All eight are enforced.** 1, 2, 4 and 5 by construction — an invalid `Money`,
+`Posting` or `Transaction` cannot be built. 6 and 7 by the `Ledger`, which never
+edits or removes an entry and corrects by reversal. 8 because no balance is
+stored anywhere; every balance is folded from the journal on demand. 3 is
+referential and cannot be enforced by construction at all, so the `Ledger`
+checks it — which is why accounts are registered with the ledger rather than
+minted by it, since a ledger that made its own accounts would satisfy this
+invariant vacuously.
 
 ---
 
