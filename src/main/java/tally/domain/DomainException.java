@@ -32,7 +32,7 @@ package tally.domain;
  * That is the mechanism working, not friction to route around.
  */
 public sealed abstract class DomainException extends RuntimeException
-        permits CurrencyMismatchException {
+        permits CurrencyMismatchException, NonPositiveAmountException {
 
     private static final long serialVersionUID = 1L;
 

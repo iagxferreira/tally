@@ -22,6 +22,8 @@ class DomainExceptionTest {
         return switch (failure) {
             case CurrencyMismatchException mismatch ->
                 mismatch.left().code() + "!=" + mismatch.right().code();
+            case NonPositiveAmountException nonPositive ->
+                "non-positive " + nonPositive.amount();
         };
     }
 
@@ -31,6 +33,18 @@ class DomainExceptionTest {
         DomainException failure = new CurrencyMismatchException(Currency.USD, Currency.JPY);
 
         assertThat(describe(failure)).isEqualTo("USD!=JPY");
+    }
+
+    @Test
+    @DisplayName("a new failure type is handled because the compiler demanded it")
+    void handlesTheSecondFailureType() {
+        // This case did not exist when describe() was written. Adding
+        // NonPositiveAmountException to DomainException's permits clause broke
+        // the switch above until it was accounted for, which is the property
+        // the sealed hierarchy exists to provide.
+        DomainException failure = new NonPositiveAmountException(Money.zero(Currency.USD));
+
+        assertThat(describe(failure)).isEqualTo("non-positive 0.00 USD");
     }
 
     @Test
