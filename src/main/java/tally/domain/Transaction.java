@@ -2,11 +2,11 @@ package tally.domain;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * A set of postings that together record one economic event, and that balance.
@@ -111,11 +111,12 @@ public final class Transaction {
             Direction sourceDirection,
             Money sourceAmount,
             List<SplitLeg> destinations) {
-        List<Posting> postings = new ArrayList<>();
-        postings.add(source.post(sourceDirection, sourceAmount));
-        for (SplitLeg leg : destinations) {
-            postings.add(leg.account().post(sourceDirection.opposite(), leg.amount()));
-        }
+        List<Posting> postings = Stream.concat(
+                        Stream.of(source.post(sourceDirection, sourceAmount)),
+                        destinations.stream()
+                                .map(leg -> leg.account()
+                                        .post(sourceDirection.opposite(), leg.amount())))
+                .toList();
         return of(clock, postings);
     }
 
@@ -136,10 +137,10 @@ public final class Transaction {
      */
     public static Transaction reverse(Clock clock, Transaction original) {
         Objects.requireNonNull(original, "original");
-        List<Posting> flipped = new ArrayList<>();
-        for (Posting posting : original.postings) {
-            flipped.add(new Posting(posting.account(), posting.direction().opposite(), posting.amount()));
-        }
+        List<Posting> flipped = original.postings.stream()
+                .map(posting -> new Posting(
+                        posting.account(), posting.direction().opposite(), posting.amount()))
+                .toList();
         return build(clock, flipped, original.id);
     }
 
@@ -181,20 +182,42 @@ public final class Transaction {
         return new Transaction(TransactionId.mint(), clock.instant(), copied, reverses);
     }
 
-    /** Debits minus credits, refusing a mix of currencies as it goes. */
+    /**
+     * Debits minus credits.
+     *
+     * <p>Each posting is mapped to its signed contribution and the results are
+     * summed. Splitting the currency check out first means this reduction is a
+     * plain fold with nothing conditional in it, and {@link Money#add} is
+     * associative over a single currency, which is what {@code reduce} requires
+     * to be correct.
+     */
     private static Money netOf(Collection<Posting> postings) {
-        Currency currency = postings.iterator().next().amount().currency();
-        Money net = Money.zero(currency);
-        for (Posting posting : postings) {
-            Currency other = posting.amount().currency();
-            if (other != currency) {
-                throw MalformedTransactionException.mixedCurrencies(currency, other);
-            }
-            net = posting.direction() == Direction.DEBIT
-                    ? net.add(posting.amount())
-                    : net.subtract(posting.amount());
-        }
-        return net;
+        Currency currency = requireSingleCurrency(postings);
+        return postings.stream()
+                .map(posting -> switch (posting.direction()) {
+                    case DEBIT -> posting.amount();
+                    case CREDIT -> posting.amount().negate();
+                })
+                .reduce(Money.zero(currency), Money::add);
+    }
+
+    /**
+     * The currency every posting shares, or a refusal naming the first two that
+     * differ.
+     *
+     * @throws MalformedTransactionException if the postings span more than one
+     *     currency
+     */
+    private static Currency requireSingleCurrency(Collection<Posting> postings) {
+        Currency first = postings.iterator().next().amount().currency();
+        postings.stream()
+                .map(posting -> posting.amount().currency())
+                .filter(currency -> currency != first)
+                .findFirst()
+                .ifPresent(other -> {
+                    throw MalformedTransactionException.mixedCurrencies(first, other);
+                });
+        return first;
     }
 
     /** This transaction's identity. */
@@ -214,7 +237,8 @@ public final class Transaction {
 
     /** The currency every posting shares. */
     public Currency currency() {
-        return postings.get(0).amount().currency();
+        // getFirst rather than get(0): SequencedCollection says what is meant.
+        return postings.getFirst().amount().currency();
     }
 
     /**
@@ -231,13 +255,10 @@ public final class Transaction {
 
     /** The total moved: the sum of the debits, which equals the sum of the credits. */
     public Money total() {
-        Money total = Money.zero(currency());
-        for (Posting posting : postings) {
-            if (posting.direction() == Direction.DEBIT) {
-                total = total.add(posting.amount());
-            }
-        }
-        return total;
+        return postings.stream()
+                .filter(posting -> posting.direction() == Direction.DEBIT)
+                .map(Posting::amount)
+                .reduce(Money.zero(currency()), Money::add);
     }
 
     @Override

@@ -67,7 +67,10 @@ public enum AccountKind {
      * credit. Nothing else is needed, and nothing is memorised.
      */
     public Direction increasedBy() {
-        return side == EquationSide.LEFT ? Direction.DEBIT : Direction.CREDIT;
+        return switch (side) {
+            case LEFT -> Direction.DEBIT;
+            case RIGHT -> Direction.CREDIT;
+        };
     }
 
     /** The direction that decreases an account of this kind. */
@@ -86,4 +89,5 @@ public enum AccountKind {
     public int effectOf(Direction direction) {
         return direction == increasedBy() ? 1 : -1;
     }
+
 }

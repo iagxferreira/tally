@@ -21,8 +21,18 @@ public enum Direction {
     /** The right side. Increases liabilities, equity and revenue; decreases the rest. */
     CREDIT;
 
-    /** The other side. Every posting has a counterpart facing this way. */
+    /**
+     * The other side. Every posting has a counterpart facing this way.
+     *
+     * <p>A {@code switch} rather than a ternary: it is exhaustive over the enum
+     * and needs no {@code default}, so a third constant could not be added
+     * without this failing to compile. A ternary would silently treat any new
+     * constant as {@code CREDIT}.
+     */
     public Direction opposite() {
-        return this == DEBIT ? CREDIT : DEBIT;
+        return switch (this) {
+            case DEBIT -> CREDIT;
+            case CREDIT -> DEBIT;
+        };
     }
 }

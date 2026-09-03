@@ -85,7 +85,7 @@ public final class Posting {
      * accounting equation rather than tabulated.
      */
     public Money effectOn(AccountKind kind) {
-        return kind.effectOf(direction) > 0 ? amount : amount.negate();
+        return direction == kind.increasedBy() ? amount : amount.negate();
     }
 
     @Override
