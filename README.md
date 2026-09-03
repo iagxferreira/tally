@@ -62,10 +62,18 @@ violating them fails to compile rather than failing in production.
   the accounting equation* rather than tabulated
 - `AccountId` — UUIDv7 record, so identifiers are minted without coordination
   and still sort near each other in an index. Rejects any non-v7 value
+- `Account` — identity, kind and a currency fixed at opening; the only way to
+  mint a `Posting`
+- `Posting` — one leg of a movement, always strictly positive and always in its
+  account's currency
+- `Transaction` — a set of postings that balance. Enforces at least two
+  postings and `sum(debits) == sum(credits)`, with `transfer`, `split` and
+  `reverse` factories over the same model
+- `TransactionId` — UUIDv7, like `AccountId`
 - `DomainException` — sealed hierarchy, so a handler switching over domain
   failures is checked for exhaustiveness and needs no `default` branch
 
-53 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
+135 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
 
 Invariant 1 — no floating point — is currently upheld by review rather than by
 the build. Java has no equivalent of the crate-wide lint the Rust version used,
@@ -77,8 +85,9 @@ Nothing.
 
 ### Not yet built
 
-`Account`, `Posting`, `Transaction` and `Ledger` — that is, everything that
-would let Tally actually record a movement of money. This is the current work.
+`Ledger` — the append-only journal that stores posted transactions and derives
+balances from them. Until it exists Tally can *construct* a valid transaction
+but has nowhere to put it, so there are no balances. This is the current work.
 
 ### Planned
 
@@ -109,17 +118,21 @@ These matter more than any API surface.
 3. Every posting references an account that exists.
 4. Posting amounts are strictly positive — direction is carried by
    `DEBIT`/`CREDIT`, never by the sign of the number.
-5. For each currency within a transaction, `sum(debits) == sum(credits)`.
-   Multi-currency transactions balance **per currency**; there is no implicit
-   exchange rate.
+5. Within a transaction, `sum(debits) == sum(credits)`. **The MVP restricts a
+   transaction to a single currency and refuses a mix.** The intended rule is
+   that multi-currency transactions balance *per currency*, with no implicit
+   exchange rate — that is not implemented, and mixed-currency postings are
+   rejected rather than silently mishandled.
 6. A posted transaction is immutable. Corrections are reversing entries, not
    edits.
 7. The journal is append-only.
 8. Balances are derived from postings, not stored as independent truth.
 
-Invariant 1 is enforced today. Invariants 2, 4, 5, 6, 7 and 8 belong to types
-that do not exist yet. Invariant 3 is referential and requires the ledger as
-context, so it cannot be enforced by construction at all.
+Invariants 1, 2, 4 and 5 are enforced today, and 6 is supported by
+`Transaction.reverse` producing a correcting entry rather than an edit.
+Invariants 7 and 8 belong to the `Ledger`, which does not exist yet. Invariant 3
+is referential and needs the ledger as context, so it cannot be enforced by
+construction at all.
 
 ---
 
