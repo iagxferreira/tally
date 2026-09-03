@@ -3,9 +3,10 @@ id: 01M1M9QRG9PWNQJXPEE51RFY1Z
 title: Decide multi-currency scope for the MVP
 kind: note
 assignee: claude-code
-status: todo
+status: done
+completed: 2026-09-03T19:42:21.520079436Z
 created: 2026-09-03T18:50:41.545377530Z
-updated: 2026-09-03T18:50:41.545377530Z
+updated: 2026-09-03T19:42:21.521073439Z
 ---
 
 Blocks [[Transaction — enforce the double-entry balance invariant]].

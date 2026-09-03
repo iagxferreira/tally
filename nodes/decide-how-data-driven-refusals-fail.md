@@ -3,9 +3,10 @@ id: 01M1M9Q28MKPB5D4QZ58ZG053T
 title: Decide how data-driven refusals fail
 kind: note
 assignee: claude-code
-status: todo
+status: done
+completed: 2026-09-03T19:42:23.029393016Z
 created: 2026-09-03T18:50:18.772841869Z
-updated: 2026-09-03T18:50:18.772841869Z
+updated: 2026-09-03T19:42:23.030387987Z
 ---
 
 The question [[ADR 009 — Domain failures are exceptions, not Result]]

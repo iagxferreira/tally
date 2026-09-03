@@ -3,9 +3,10 @@ id: 01M1M9QGM9N8TN1WNDQEAZ6M0Z
 title: Decide Transaction identity and timestamp
 kind: note
 assignee: claude-code
-status: todo
+status: done
+completed: 2026-09-03T19:42:19.982161813Z
 created: 2026-09-03T18:50:33.481560599Z
-updated: 2026-09-03T18:50:33.481560599Z
+updated: 2026-09-03T19:42:19.983326634Z
 ---
 
 Blocks [[Transaction — enforce the double-entry balance invariant]].
