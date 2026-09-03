@@ -1,5 +1,6 @@
 package tally.domain;
 
+import java.math.BigInteger;
 import java.util.Objects;
 
 /**
@@ -7,58 +8,85 @@ import java.util.Objects;
  *
  * <p>{@code Money.of(150, USD)} is one dollar fifty. {@code Money.of(150, JPY)}
  * is one hundred and fifty yen. The number alone is meaningless; the currency
- * carries the scale that gives it meaning. See ADR 001.
+ * carries the scale that gives it meaning. See ADR 001 and ADR 008.
+ *
+ * <h2>Why minor units, and why not BigDecimal</h2>
+ *
+ * <p>Counting minor units makes the invariant structural: there is no way to
+ * write half a cent, because half a cent is not an integer number of cents. A
+ * {@code BigDecimal} would happily hold {@code 1.005 USD}, demoting that
+ * invariant to a rule someone has to keep revalidating.
+ *
+ * <p>{@code BigDecimal} carries a second trap for a record: its {@code equals}
+ * compares scale as well as value, so {@code 1.50} and {@code 1.5} are unequal
+ * while {@code compareTo} calls them the same. A value type that disagrees with
+ * itself about equality breaks hash maps, {@code contains}, and every test
+ * assertion. {@link BigInteger} has no scale, so the record's generated
+ * {@code equals} is simply correct.
  *
  * <p>There is no floating point here and there never will be. Binary floating
  * point cannot represent 0.10 exactly, so a cent goes missing somewhere around
- * the ten-thousandth addition, and the ledger stops balancing for reasons
- * nobody can reconstruct.
+ * the ten-thousandth addition and the ledger stops balancing for reasons nobody
+ * can reconstruct.
  *
- * <h2>Overflow</h2>
+ * <h2>Why arithmetic mostly cannot fail</h2>
  *
- * <p>Every operation goes through {@link Math#addExact} and its relatives.
- * This is load-bearing rather than decorative: Java's {@code long} wraps
- * silently on overflow in <em>every</em> build, and unlike the Rust original
- * there is no profile setting that turns wrapping into a panic. A raw
- * {@code +} that slips past review here is a silent financial bug. The
- * {@link ArithmeticException} those methods throw is a JDK implementation
- * detail and is converted to {@link MoneyError.Overflow} at this boundary — it
- * must not escape the domain.
+ * <p>{@link BigInteger} is unbounded, so addition, subtraction and negation
+ * cannot overflow. That deletes an entire class of failure that a {@code long}
+ * representation had to carry: with {@code long}, every arithmetic call had to
+ * return a result that might be an overflow error, and a raw {@code +} that
+ * slipped past review would wrap silently into a plausible, wrong balance.
+ *
+ * <p>What remains is {@link #negate()}, which is now total and returns a
+ * {@code Money} directly, and {@link #add(Money)} / {@link #subtract(Money)},
+ * which can still fail for exactly one reason: the currencies differ.
+ *
+ * <p>The cost is an allocation per operation and the loss of primitive
+ * comparison. That is accepted: correctness before performance, and optimising
+ * without a measurement is forbidden by the project's principles.
  *
  * <p>Instances are immutable and safe to share.
  */
-public record Money(long minorUnits, Currency currency) implements Comparable<Money> {
+public record Money(BigInteger minorUnits, Currency currency) implements Comparable<Money> {
 
-    /** @throws NullPointerException if {@code currency} is null — a programmer error, not a domain failure */
+    /** @throws NullPointerException on a null component — a programmer error, not a domain failure */
     public Money {
+        Objects.requireNonNull(minorUnits, "minorUnits");
         Objects.requireNonNull(currency, "currency");
     }
 
     /** An amount of {@code minorUnits} in {@code currency}. */
-    public static Money of(long minorUnits, Currency currency) {
+    public static Money of(BigInteger minorUnits, Currency currency) {
         return new Money(minorUnits, currency);
+    }
+
+    /**
+     * An amount of {@code minorUnits} in {@code currency}.
+     *
+     * <p>A convenience for the overwhelmingly common case of an amount that
+     * fits in a {@code long}. It is only a constructor shortcut: the value is
+     * widened immediately and nothing downstream is bounded by {@code long}.
+     */
+    public static Money of(long minorUnits, Currency currency) {
+        return new Money(BigInteger.valueOf(minorUnits), currency);
     }
 
     /** Zero in the given currency. Zero is currency-specific: there is no universal zero to compare against. */
     public static Money zero(Currency currency) {
-        return new Money(0L, currency);
+        return new Money(BigInteger.ZERO, currency);
     }
 
     /**
      * This amount plus {@code other}.
      *
      * @return the sum, or {@link MoneyError.CurrencyMismatch} if the currencies
-     *     differ, or {@link MoneyError.Overflow} if the result does not fit
+     *     differ. There is no overflow case: the representation is unbounded.
      */
     public Result<Money, MoneyError> add(Money other) {
         if (currency != other.currency) {
             return Result.err(new MoneyError.CurrencyMismatch(currency, other.currency));
         }
-        try {
-            return Result.ok(new Money(Math.addExact(minorUnits, other.minorUnits), currency));
-        } catch (ArithmeticException overflow) {
-            return Result.err(new MoneyError.Overflow(minorUnits, other.minorUnits));
-        }
+        return Result.ok(new Money(minorUnits.add(other.minorUnits), currency));
     }
 
     /**
@@ -68,46 +96,42 @@ public record Money(long minorUnits, Currency currency) implements Comparable<Mo
      * posting: negative amounts are meaningful when deriving a balance, and it
      * is {@code Posting} that requires strict positivity, because there
      * direction is carried by {@code Direction} rather than by a sign.
+     *
+     * @return the difference, or {@link MoneyError.CurrencyMismatch} if the
+     *     currencies differ
      */
     public Result<Money, MoneyError> subtract(Money other) {
         if (currency != other.currency) {
             return Result.err(new MoneyError.CurrencyMismatch(currency, other.currency));
         }
-        try {
-            return Result.ok(new Money(Math.subtractExact(minorUnits, other.minorUnits), currency));
-        } catch (ArithmeticException overflow) {
-            return Result.err(new MoneyError.Overflow(minorUnits, other.minorUnits));
-        }
+        return Result.ok(new Money(minorUnits.subtract(other.minorUnits), currency));
     }
 
     /**
      * This amount negated.
      *
-     * @return the negation, or {@link MoneyError.Overflow} for
-     *     {@link Long#MIN_VALUE}, which has no positive counterpart in two's
-     *     complement
+     * <p>Total, and deliberately so. With a {@code long} representation this
+     * had to be fallible, because two's complement has no positive counterpart
+     * for {@code Long.MIN_VALUE}. An unbounded representation has no such
+     * asymmetry.
      */
-    public Result<Money, MoneyError> negate() {
-        try {
-            return Result.ok(new Money(Math.negateExact(minorUnits), currency));
-        } catch (ArithmeticException overflow) {
-            return Result.err(new MoneyError.Overflow(minorUnits, 0L));
-        }
+    public Money negate() {
+        return new Money(minorUnits.negate(), currency);
     }
 
     /** Whether this amount is greater than zero. */
     public boolean isPositive() {
-        return minorUnits > 0L;
+        return minorUnits.signum() > 0;
     }
 
     /** Whether this amount is zero. */
     public boolean isZero() {
-        return minorUnits == 0L;
+        return minorUnits.signum() == 0;
     }
 
     /** Whether this amount is less than zero. */
     public boolean isNegative() {
-        return minorUnits < 0L;
+        return minorUnits.signum() < 0;
     }
 
     /**
@@ -125,7 +149,7 @@ public record Money(long minorUnits, Currency currency) implements Comparable<Mo
             throw new IllegalArgumentException(
                     "cannot order " + currency.code() + " against " + other.currency.code());
         }
-        return Long.compare(minorUnits, other.minorUnits);
+        return minorUnits.compareTo(other.minorUnits);
     }
 
     /**
@@ -141,15 +165,10 @@ public record Money(long minorUnits, Currency currency) implements Comparable<Mo
         if (scale == 0) {
             return minorUnits + " " + currency.code();
         }
-        // Not Math.abs: abs(Long.MIN_VALUE) is still negative, because two's
-        // complement has no positive counterpart for it.
-        String digits = Long.toString(minorUnits);
-        if (digits.startsWith("-")) {
-            digits = digits.substring(1);
-        }
+        String digits = minorUnits.abs().toString();
         String padded = "0".repeat(Math.max(0, scale + 1 - digits.length())) + digits;
         int split = padded.length() - scale;
-        String sign = minorUnits < 0L ? "-" : "";
+        String sign = isNegative() ? "-" : "";
         return sign + padded.substring(0, split) + "." + padded.substring(split) + " " + currency.code();
     }
 }

@@ -6,6 +6,12 @@ package tally.domain;
  * <p>Each case carries the values that caused it, so a caller can report the
  * fault without the domain formatting prose. Domain errors are matchable
  * values, never strings — see ADR 007.
+ *
+ * <p>There is exactly one case, and that is the point: since {@link Money}
+ * holds an unbounded {@link java.math.BigInteger}, arithmetic cannot overflow,
+ * so mixing currencies is the only way arithmetic can fail. The interface stays
+ * sealed rather than collapsing into a single exception type because adding a
+ * second failure later should break every incomplete {@code switch}.
  */
 public sealed interface MoneyError {
 
@@ -17,12 +23,4 @@ public sealed interface MoneyError {
      * silently is how a ledger stops reconciling.
      */
     record CurrencyMismatch(Currency left, Currency right) implements MoneyError {}
-
-    /**
-     * The result did not fit in 64 bits.
-     *
-     * <p>Reported rather than wrapped. A wrapped balance is the worst failure a
-     * ledger has: it is silent, it is plausible, and it is wrong.
-     */
-    record Overflow(long left, long right) implements MoneyError {}
 }
