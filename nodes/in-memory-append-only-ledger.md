@@ -7,7 +7,7 @@ status: done
 completed: 2026-09-03T20:01:22.168870958Z
 depends_on: [01M1M2WS9DWCXM34B3KG63HB86]
 created: 2026-09-03T16:51:10.794681493Z
-updated: 2026-09-03T20:01:22.170134155Z
+updated: 2026-09-03T23:11:41.238535770Z
 ---
 
 Increment 9 of [[Tally Java MVP — development plan]]. The last domain piece of
@@ -122,3 +122,7 @@ seven subclasses and a test pins that count.
 differences, both deliberate: the clock is injected rather than ambient, and
 accounts must be registered with the ledger before use — which is the invariant
 3 decision showing up in the call site.
+
+## Review finding, 2026-09-03
+
+`Ledger.register` currently overwrites `accounts` by `AccountId` without checking the existing account definition. `Account.reopen` can therefore supply the same ID with a different kind or currency after postings exist. Subsequent `balanceOf` then either derives historic postings using a different sign rule or starts its fold at a zero in the replacement currency and throws `CurrencyMismatchException`. Account registration must be immutable per ID, or reject conflicting definitions; the behavior needs a typed failure decision and regression tests.
