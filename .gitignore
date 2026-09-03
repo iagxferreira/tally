@@ -1,5 +1,6 @@
 # Gradle
 /build/
+/bin/
 /.gradle/
 
 # MindGraph time-tracking telemetry: local state, not content.
