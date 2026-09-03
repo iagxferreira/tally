@@ -56,29 +56,31 @@ that reason. Write Java that reads like Java.
 
 ```
 src/main/java/tally/domain/   pure domain — no HTTP, JDBC, Jackson, frameworks
-                money/        Currency, Money
-                account/      Account, AccountId, AccountKind, Direction, Posting
-                ledger/       Transaction, TransactionId, Ledger
-                failure/      DomainException and its permitted subclasses
 src/main/java/tally/core/     composition over the domain
-src/test/java/                tests, mirroring the same folders
+src/test/java/                tests
 build.gradle.kts              one module
 mise.toml                     pinned JDK and Gradle
 ```
 
-**Those folders are not packages.** Every file under `src/main/java/tally/domain`
-declares `package tally.domain`, whatever directory it sits in. The folders make
-the domain navigable; the single package is what keeps two invariants working,
-and both would break if the folders became real subpackages:
+The domain is **one flat package**, and stays that way. Two invariants depend on
+it, so neither real subpackages nor source folders that disagree with the
+package are an option:
 
 - `Posting`'s constructor and `flip()` are package-private, so only `Account`
-  and `Transaction` can mint a posting. Subpackages would force them public.
+  and `Transaction` can mint a posting. Subpackages would force them public and
+  delete ADR 005.
 - `DomainException` is `sealed`, and outside a named module a sealed type's
   permitted subclasses must share its package.
 
-An IDE will report the directories as mismatched and offer to "fix" it. Refuse:
-accepting would quietly turn the folders into packages and delete both
-guarantees. Do not add `module-info.java` to work around this.
+Grouping the sources into folders while keeping one package was tried and
+reverted: it builds, but every IDE reports the directory and package as
+mismatched on every file, which is worse than a long file list. Do not retry it,
+and do not add `module-info.java`.
+
+Flatness is also ADR 005's mitigation for package privacy being weaker than
+Rust's module privacy — the guarantee rests on this package staying small enough
+to read in full. When it stops being so, extract a real module rather than
+subdividing.
 
 Tally is a **single Gradle module**, not a module tree. Do not introduce
 `:tally-domain` / `:tally-core` / `:tally-app`, and do not create modules in
