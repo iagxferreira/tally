@@ -24,6 +24,10 @@ class DomainExceptionTest {
                 mismatch.left().code() + "!=" + mismatch.right().code();
             case NonPositiveAmountException nonPositive ->
                 "non-positive " + nonPositive.amount();
+            case UnbalancedTransactionException unbalanced ->
+                "unbalanced by " + unbalanced.imbalance();
+            case MalformedTransactionException malformed ->
+                "malformed: " + malformed.getMessage();
         };
     }
 
@@ -45,6 +49,18 @@ class DomainExceptionTest {
         DomainException failure = new NonPositiveAmountException(Money.zero(Currency.USD));
 
         assertThat(describe(failure)).isEqualTo("non-positive 0.00 USD");
+    }
+
+    @Test
+    @DisplayName("the transaction failures were handled because the compiler demanded it")
+    void handlesTheTransactionFailures() {
+        // Third time this switch has been broken by a new permitted subclass,
+        // and third time the compiler forced it to be considered rather than
+        // letting it fall through a default branch.
+        DomainException unbalanced =
+                new UnbalancedTransactionException(Money.of(100, Currency.USD));
+
+        assertThat(describe(unbalanced)).isEqualTo("unbalanced by 1.00 USD");
     }
 
     @Test
