@@ -34,6 +34,8 @@ class DomainExceptionTest {
                 "unknown transaction " + unknownTransaction.transaction();
             case DuplicateTransactionException duplicate ->
                 "duplicate " + duplicate.transaction();
+            case ConflictingAccountException conflicting ->
+                "conflicting account " + conflicting.account();
         };
     }
 
@@ -76,6 +78,11 @@ class DomainExceptionTest {
 
         assertThat(describe(new UnknownAccountException(account)))
                 .isEqualTo("unknown account " + account);
+
+        assertThat(describe(new ConflictingAccountException(
+                        Account.reopen(account, AccountKind.ASSET, Currency.USD),
+                        Account.reopen(account, AccountKind.LIABILITY, Currency.USD))))
+                .isEqualTo("conflicting account " + account);
     }
 
     @Test
@@ -84,7 +91,7 @@ class DomainExceptionTest {
         // Four rounds of new failure types, and each one broke this switch
         // until it was accounted for. Under an open hierarchy each would have
         // fallen silently through a default branch instead.
-        assertThat(DomainException.class.getPermittedSubclasses()).hasSize(7);
+        assertThat(DomainException.class.getPermittedSubclasses()).hasSize(8);
     }
 
     @Test

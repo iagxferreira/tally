@@ -24,13 +24,13 @@ class InvariantPropertyTest {
         Account cash = Account.open(AccountKind.ASSET, Currency.USD);
         Account revenue = Account.open(AccountKind.REVENUE, Currency.USD);
         Ledger ledger = new Ledger();
-        ledger.registerAll(cash, revenue);
+        ledger = ledger.registerAll(cash, revenue);
 
         for (int i = 0; i < CASES; i++) {
             long amount = random.nextLong(1, 1_000_000);
             Transaction transaction = Transaction.transfer(CLOCK, revenue, cash, Money.of(amount, Currency.USD));
-            ledger.post(transaction);
-            ledger.post(Transaction.reverse(CLOCK, transaction));
+            ledger = ledger.post(transaction);
+            ledger = ledger.post(Transaction.reverse(CLOCK, transaction));
         }
 
         assertThat(ledger.balanceOf(cash)).isEqualTo(Money.zero(Currency.USD));

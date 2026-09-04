@@ -24,14 +24,14 @@ class LedgerTest {
     private final Account revenue = Account.open(AccountKind.REVENUE, Currency.USD);
     private final Account taxDue = Account.open(AccountKind.LIABILITY, Currency.USD);
 
-    private final Ledger ledger = new Ledger();
+    private Ledger ledger = new Ledger();
 
     private Money usd(long minorUnits) {
         return Money.of(minorUnits, Currency.USD);
     }
 
     private Ledger withAccounts() {
-        ledger.registerAll(cash, revenue, taxDue);
+        ledger = ledger.registerAll(cash, revenue, taxDue);
         return ledger;
     }
 
@@ -46,7 +46,7 @@ class LedgerTest {
 
             Transaction sale = Transaction.of(
                     clock, cash.debit(usd(2500)), revenue.credit(usd(2500)));
-            ledger.post(sale);
+            ledger = ledger.post(sale);
 
             assertThat(ledger.balanceOf(cash)).isEqualTo(usd(2500));
             assertThat(ledger.balanceOf(revenue)).isEqualTo(usd(2500));
@@ -61,7 +61,7 @@ class LedgerTest {
             // Revenue is credited, and a credit increases revenue. Cash is
             // debited, and a debit increases an asset. Both balances are
             // positive despite being on opposite sides of the transaction.
-            ledger.post(Transaction.of(clock, cash.debit(usd(2500)), revenue.credit(usd(2500))));
+            ledger = ledger.post(Transaction.of(clock, cash.debit(usd(2500)), revenue.credit(usd(2500))));
 
             assertThat(ledger.balanceOf(cash).isPositive()).isTrue();
             assertThat(ledger.balanceOf(revenue).isPositive()).isTrue();
@@ -72,7 +72,7 @@ class LedgerTest {
         void recordsAMultiLeggedEvent() {
             withAccounts();
 
-            ledger.post(Transaction.of(
+            ledger = ledger.post(Transaction.of(
                     clock,
                     cash.debit(usd(11000)),
                     revenue.credit(usd(10000)),
@@ -90,7 +90,7 @@ class LedgerTest {
             withAccounts();
 
             for (int i = 0; i < 10; i++) {
-                ledger.post(Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100))));
+                ledger = ledger.post(Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100))));
             }
 
             assertThat(ledger.balanceOf(cash)).isEqualTo(usd(1000));
@@ -106,8 +106,8 @@ class LedgerTest {
         @Test
         @DisplayName("refuses a transaction naming an unregistered account")
         void refusesAnUnknownAccount() {
-            ledger.register(cash);
-            ledger.register(revenue);
+            ledger = ledger.register(cash);
+            ledger = ledger.register(revenue);
             Account stranger = Account.open(AccountKind.EXPENSE, Currency.USD);
 
             Transaction transaction =
@@ -123,7 +123,7 @@ class LedgerTest {
         @DisplayName("a refused transaction leaves the journal untouched")
         void doesNotPartiallyApplyARefusedTransaction() {
             withAccounts();
-            ledger.post(Transaction.of(clock, cash.debit(usd(500)), revenue.credit(usd(500))));
+            ledger = ledger.post(Transaction.of(clock, cash.debit(usd(500)), revenue.credit(usd(500))));
             Account stranger = Account.open(AccountKind.EXPENSE, Currency.USD);
 
             Transaction bad = Transaction.of(clock, stranger.debit(usd(100)), cash.credit(usd(100)));
@@ -144,11 +144,23 @@ class LedgerTest {
         @Test
         @DisplayName("registering the same account twice is accepted and changes nothing")
         void registrationIsIdempotent() {
-            ledger.register(cash);
-            ledger.register(cash);
+            ledger = ledger.register(cash);
+            ledger = ledger.register(cash);
 
             assertThat(ledger.accounts()).hasSize(1);
             assertThat(ledger.account(cash.id())).contains(cash);
+        }
+
+        @Test
+        @DisplayName("re-registering an ID with different metadata must not reinterpret history")
+        void conflictingRegistrationCannotChangeAccountMeaning() {
+            ledger = ledger.registerAll(cash, revenue);
+            ledger = ledger.post(Transaction.of(clock, cash.debit(usd(500)), revenue.credit(usd(500))));
+
+            Account conflicting = Account.reopen(cash.id(), AccountKind.ASSET, Currency.EUR);
+
+            assertThatThrownBy(() -> ledger.register(conflicting))
+                    .isInstanceOf(ConflictingAccountException.class);
         }
     }
 
@@ -157,13 +169,42 @@ class LedgerTest {
     class AppendOnly {
 
         @Test
+        @DisplayName("writes return new snapshots and leave the source ledger unchanged")
+        void writesDoNotMutateTheirSource() {
+            Ledger empty = new Ledger();
+            Ledger registered = empty.registerAll(cash, revenue);
+            Transaction sale = Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100)));
+            Ledger posted = registered.post(sale);
+
+            assertThat(empty.accounts()).isEmpty();
+            assertThat(empty.size()).isZero();
+            assertThat(registered.size()).isZero();
+            assertThat(posted.journal()).containsExactly(sale);
+        }
+
+        @Test
+        @DisplayName("two writes from one snapshot produce independent branches")
+        void snapshotsCanBranchWithoutCrossContamination() {
+            Ledger registered = new Ledger().registerAll(cash, revenue);
+            Transaction first = Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100)));
+            Transaction second = Transaction.of(clock, cash.debit(usd(200)), revenue.credit(usd(200)));
+
+            Ledger firstBranch = registered.post(first);
+            Ledger secondBranch = registered.post(second);
+
+            assertThat(registered.size()).isZero();
+            assertThat(firstBranch.journal()).containsExactly(first);
+            assertThat(secondBranch.journal()).containsExactly(second);
+        }
+
+        @Test
         void preservesPostingOrder() {
             withAccounts();
             Transaction first = Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100)));
             Transaction second = Transaction.of(clock, cash.debit(usd(200)), revenue.credit(usd(200)));
 
-            ledger.post(first);
-            ledger.post(second);
+            ledger = ledger.post(first);
+            ledger = ledger.post(second);
 
             assertThat(ledger.journal()).containsExactly(first, second);
         }
@@ -173,7 +214,7 @@ class LedgerTest {
         void handsOutAnUnmodifiableJournal() {
             withAccounts();
             Transaction posted = Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100)));
-            ledger.post(posted);
+            ledger = ledger.post(posted);
 
             List<Transaction> view = ledger.journal();
 
@@ -187,7 +228,7 @@ class LedgerTest {
         void refusesADuplicate() {
             withAccounts();
             Transaction sale = Transaction.of(clock, cash.debit(usd(100)), revenue.credit(usd(100)));
-            ledger.post(sale);
+            ledger = ledger.post(sale);
 
             assertThatThrownBy(() -> ledger.post(sale))
                     .isInstanceOf(DuplicateTransactionException.class);
@@ -204,9 +245,9 @@ class LedgerTest {
         void reversalUndoesTheEffect() {
             withAccounts();
             Transaction mistake = Transaction.of(clock, cash.debit(usd(2500)), revenue.credit(usd(2500)));
-            ledger.post(mistake);
+            ledger = ledger.post(mistake);
 
-            ledger.post(Transaction.reverse(clock, mistake));
+            ledger = ledger.post(Transaction.reverse(clock, mistake));
 
             assertThat(ledger.balanceOf(cash)).isEqualTo(Money.zero(Currency.USD));
             assertThat(ledger.balanceOf(revenue)).isEqualTo(Money.zero(Currency.USD));
@@ -217,10 +258,10 @@ class LedgerTest {
         void keepsBothEntriesInTheJournal() {
             withAccounts();
             Transaction mistake = Transaction.of(clock, cash.debit(usd(2500)), revenue.credit(usd(2500)));
-            ledger.post(mistake);
+            ledger = ledger.post(mistake);
 
             Transaction correction = Transaction.reverse(clock, mistake);
-            ledger.post(correction);
+            ledger = ledger.post(correction);
 
             // A rollback would leave one entry, or none. An auditor must see
             // that the mistake happened and that it was corrected.
@@ -253,7 +294,7 @@ class LedgerTest {
         @DisplayName("a trial balance reports every registered account")
         void reportsATrialBalance() {
             withAccounts();
-            ledger.post(Transaction.of(
+            ledger = ledger.post(Transaction.of(
                     clock, cash.debit(usd(11000)), revenue.credit(usd(10000)), taxDue.credit(usd(1000))));
 
             assertThat(ledger.balances())
@@ -266,7 +307,7 @@ class LedgerTest {
         @DisplayName("an account with no postings has a zero balance in its own currency")
         void reportsZeroForAnUnusedAccount() {
             Account yen = Account.open(AccountKind.ASSET, Currency.JPY);
-            ledger.register(yen);
+            ledger = ledger.register(yen);
 
             assertThat(ledger.balanceOf(yen)).isEqualTo(Money.zero(Currency.JPY));
         }
@@ -282,7 +323,7 @@ class LedgerTest {
         @DisplayName("registering an account after posting still derives its full history")
         void derivesFromTheJournalNotFromRegistrationTime() {
             withAccounts();
-            ledger.post(Transaction.of(clock, cash.debit(usd(700)), revenue.credit(usd(700))));
+            ledger = ledger.post(Transaction.of(clock, cash.debit(usd(700)), revenue.credit(usd(700))));
 
             // Nothing was cached at post time; the balance is folded from the
             // journal on every call, so re-reading gives the same answer.

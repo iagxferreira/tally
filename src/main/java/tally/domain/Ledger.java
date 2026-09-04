@@ -2,6 +2,7 @@ package tally.domain;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,7 +15,8 @@ import java.util.Optional;
  * it.
  *
  * <p>This is the piece that makes the rest of the domain a ledger rather than a
- * collection of value types. It holds invariants 3, 7 and 8:
+ * collection of value types. It holds invariants 3, 7 and 8. A ledger is an
+ * immutable snapshot: writes return a new ledger and never alter the receiver:
  *
  * <ul>
  *   <li><b>3 — every posting references an account that exists.</b> The only
@@ -50,36 +52,60 @@ import java.util.Optional;
  *
  * <h2>Concurrency</h2>
  *
- * <p><b>This class is not thread-safe.</b> Two threads posting concurrently
- * will corrupt the journal, and a balance read during a post may observe a
- * partially applied transaction. That is stated rather than defended: the
- * consistency guarantees of concurrent posting are a Phase 2 question that
- * needs a real storage model to answer, and guessing at a locking scheme now
- * would be solving it before it is understood.
+ * <p>Instances are safe to share between readers because their state never
+ * changes. Concurrent writers still need coordination when choosing which
+ * returned snapshot becomes current; immutable snapshots do not prevent two
+ * writers from both starting with the same stale ledger.
+ *
+ * <p>Concurrent writes still require coordination at the application boundary.
  */
 public final class Ledger {
 
-    private final Map<AccountId, Account> accounts = new HashMap<>();
-    private final Map<TransactionId, Transaction> journal = new LinkedHashMap<>();
+    private final Map<AccountId, Account> accounts;
+    private final Map<TransactionId, Transaction> journal;
+
+    /** An empty ledger snapshot. */
+    public Ledger() {
+        this(Map.of(), Map.of());
+    }
+
+    private Ledger(Map<AccountId, Account> accounts, Map<TransactionId, Transaction> journal) {
+        this.accounts = Map.copyOf(accounts);
+        this.journal = Collections.unmodifiableMap(new LinkedHashMap<>(journal));
+    }
 
     /**
      * Registers an account so transactions may reference it.
      *
-     * <p>Re-registering the same account is accepted and does nothing: an
-     * account is identified by its {@link AccountId}, so this is not a change
-     * of state and refusing it would make replaying a set of registrations
-     * needlessly fragile.
+     * <p>Re-registering the same account definition is accepted and does
+     * nothing. A conflicting definition is refused: replacing the kind or
+     * currency would reinterpret postings already in the journal.
+     *
+     * @throws ConflictingAccountException if the identifier is already
+     *     registered with a different kind or currency
      */
-    public void register(Account account) {
+    public Ledger register(Account account) {
         Objects.requireNonNull(account, "account");
-        accounts.put(account.id(), account);
+        Account existing = accounts.get(account.id());
+        if (existing != null
+                && (existing.kind() != account.kind() || existing.currency() != account.currency())) {
+            throw new ConflictingAccountException(existing, account);
+        }
+        if (existing != null) {
+            return this;
+        }
+        Map<AccountId, Account> updated = new HashMap<>(accounts);
+        updated.put(account.id(), account);
+        return new Ledger(updated, journal);
     }
 
-    /** Registers several accounts. */
-    public void registerAll(Account... toRegister) {
+    /** Registers several accounts, returning the resulting snapshot. */
+    public Ledger registerAll(Account... toRegister) {
+        Ledger result = this;
         for (Account account : toRegister) {
-            register(account);
+            result = result.register(account);
         }
+        return result;
     }
 
     /** The account with this identifier, if it is registered. */
@@ -101,7 +127,7 @@ public final class Ledger {
      * @throws UnknownTransactionException if this is a reversal of a
      *     transaction the journal has no record of
      */
-    public void post(Transaction transaction) {
+    public Ledger post(Transaction transaction) {
         Objects.requireNonNull(transaction, "transaction");
         if (journal.containsKey(transaction.id())) {
             throw new DuplicateTransactionException(transaction.id());
@@ -121,7 +147,9 @@ public final class Ledger {
                 .ifPresent(original -> {
                     throw new UnknownTransactionException(original);
                 });
-        journal.put(transaction.id(), transaction);
+        Map<TransactionId, Transaction> updated = new LinkedHashMap<>(journal);
+        updated.put(transaction.id(), transaction);
+        return new Ledger(accounts, updated);
     }
 
     /**
@@ -154,7 +182,7 @@ public final class Ledger {
     /**
      * The journal, in the order transactions were posted.
      *
-     * <p>An unmodifiable view: invariant 7 says the journal is append-only, and
+     * <p>An immutable copy: invariant 7 says the journal is append-only, and
      * handing out a mutable list would make that a matter of trust.
      */
     public List<Transaction> journal() {

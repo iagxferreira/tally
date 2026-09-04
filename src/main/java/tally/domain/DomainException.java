@@ -38,7 +38,8 @@ public sealed abstract class DomainException extends RuntimeException
                 MalformedTransactionException,
                 UnknownAccountException,
                 UnknownTransactionException,
-                DuplicateTransactionException {
+                DuplicateTransactionException,
+                ConflictingAccountException {
 
     private static final long serialVersionUID = 1L;
 
