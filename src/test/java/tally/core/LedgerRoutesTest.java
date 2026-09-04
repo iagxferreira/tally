@@ -81,6 +81,35 @@ class LedgerRoutesTest {
     }
 
     @Test
+    void rejectsATransactionWithTooFewPostings() {
+        given().contentType("application/json")
+                .body("{\"postings\":[]}")
+                .when().post("/transactions")
+                .then().statusCode(400);
+    }
+
+    @Test
+    void rejectsANonPositivePostingAmount() {
+        given().contentType("application/json")
+                .body("""
+                        {"postings":[
+                          {"accountId":"00000000-0000-7000-8000-000000000000","direction":"DEBIT","minorUnits":0,"currency":"USD"},
+                          {"accountId":"00000000-0000-7000-8000-000000000001","direction":"CREDIT","minorUnits":0,"currency":"USD"}
+                        ]}
+                        """)
+                .when().post("/transactions")
+                .then().statusCode(400);
+    }
+
+    @Test
+    void rejectsAnInvalidNestedPosting() {
+        given().contentType("application/json")
+                .body("{\"postings\":[{},{}]}")
+                .when().post("/transactions")
+                .then().statusCode(400);
+    }
+
+    @Test
     void journalRouteReturnsPostedTransactions() {
         given().when().get("/journal").then().statusCode(200);
     }
