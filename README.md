@@ -78,8 +78,11 @@ violating them fails to compile rather than failing in production.
   failures is checked for exhaustiveness and needs no `default` branch
 - Quarkus HTTP API with OpenAPI JSON and Swagger UI
 - `POST /accounts` — opens and registers an account in the process-local ledger
+- `POST /transactions` — posts balanced transactions using exact minor units
+- `GET /journal` — reads the immutable in-memory journal in posting order
 
-155 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
+The domain and HTTP contracts are covered by tests. Compilation runs with
+`-Xlint:all -Werror` and Error Prone.
 
 Invariant 1 — no floating point — is currently upheld by review rather than by
 the build. Java has no equivalent of the crate-wide lint the Rust version used,
@@ -91,9 +94,9 @@ Nothing.
 
 ### Not yet built
 
-Everything outside the in-memory domain: persistence, transaction and journal
-API behavior, concurrent posting, idempotency, events, reconciliation. See the
-phase table below.
+Everything outside the in-memory domain: persistence, balance API behavior,
+concurrent posting, idempotency, events, reconciliation. See the phase table
+below.
 
 The `Ledger` is **not thread-safe**, and deliberately so — the consistency
 guarantees of concurrent posting need a real storage model to answer, and
@@ -116,8 +119,9 @@ until earlier ones are solid.
 | 7 | Production engineering: tracing, metrics, health checks, failure injection |
 | 8 | Performance: measured, never assumed |
 
-Phase 1 is complete. Phase 3 has its HTTP foundation and account-creation slice;
-the remaining API behavior is not implemented.
+Phase 1 is complete. Phase 3 has its HTTP foundation, account creation,
+transaction posting, and journal read slices; balance behavior and production
+concerns remain.
 
 ---
 
