@@ -13,4 +13,10 @@
 *.iml
 /.vscode/
 
+# Eclipse
+.classpath
+.factorypath
+.project
+/.settings/
+
 .env
