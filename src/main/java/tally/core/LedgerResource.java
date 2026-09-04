@@ -47,7 +47,7 @@ public final class LedgerResource {
                     .entity(Map.of("message", "kind and currency are required"))
                     .build();
         }
-        AccountResponse account = AccountResponse.from(
+        var account = AccountResponse.from(
                 ledgerService.openAccount(request.kind(), request.currency()));
         return Response.status(Response.Status.CREATED).entity(account).build();
     }
