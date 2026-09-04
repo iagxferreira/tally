@@ -65,6 +65,36 @@ class LedgerRoutesTest {
     }
 
     @Test
+    void accountBalanceChangesAcrossASequentialDepositAndTransaction() {
+        String assetAccount = createAccount("ASSET", "USD");
+        String revenueAccount = createAccount("REVENUE", "USD");
+
+        given().when().get("/accounts/" + assetAccount + "/balance")
+                .then().statusCode(200)
+                .body("minorUnits", is(0));
+
+        given().contentType("application/json")
+                .body(transactionJson(assetAccount, revenueAccount, 1250, 1250))
+                .when().post("/transactions")
+                .then().statusCode(201);
+
+        given().when().get("/accounts/" + assetAccount + "/balance")
+                .then().statusCode(200)
+                .body("minorUnits", is(1250));
+
+        String expenseAccount = createAccount("EXPENSE", "USD");
+        given().contentType("application/json")
+                .body(transactionJson(expenseAccount, assetAccount, 300, 300))
+                .when().post("/transactions")
+                .then().statusCode(201);
+
+        given().when().get("/accounts/" + assetAccount + "/balance")
+                .then().statusCode(200)
+                .body("minorUnits", is(950))
+                .body("currency", is("USD"));
+    }
+
+    @Test
     void returnsNotFoundForAnUnknownAccount() {
         given().when().get("/accounts/00000000-0000-7000-8000-000000000000/balance")
                 .then().statusCode(404);
