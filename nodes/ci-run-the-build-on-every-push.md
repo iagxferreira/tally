@@ -3,9 +3,9 @@ id: 01M1MH42R29DSSV5055BMP2XM1
 title: "CI: run the build on every push"
 kind: note
 assignee: claude-code
-status: todo
+status: doing
 created: 2026-09-03T20:59:45.282827754Z
-updated: 2026-09-03T20:59:45.282827754Z
+updated: 2026-09-04T04:01:53.350696910Z
 ---
 
 There is no CI. `.github/` does not exist, and nothing verifies the build on
