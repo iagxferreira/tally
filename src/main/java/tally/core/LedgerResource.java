@@ -8,15 +8,22 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /** Initial HTTP route contract for the in-memory ledger. */
 @Path("/")
 @Produces(MediaType.APPLICATION_JSON)
+@Tag(name = "Ledger")
 public final class LedgerResource {
 
     /** The account command route. */
     @POST
     @Path("accounts")
+    @Operation(summary = "Create an account")
+    @APIResponse(responseCode = "501", description = "Account creation is not implemented", content = @Content)
     public Response accounts() {
         return notImplemented();
     }
@@ -24,6 +31,8 @@ public final class LedgerResource {
     /** The account balance query route. */
     @GET
     @Path("accounts/{id}/balance")
+    @Operation(summary = "Read an account balance")
+    @APIResponse(responseCode = "501", description = "Balance queries are not implemented", content = @Content)
     public Response balance(@PathParam("id") String id) {
         return notImplemented();
     }
@@ -31,6 +40,8 @@ public final class LedgerResource {
     /** The transaction command route. */
     @POST
     @Path("transactions")
+    @Operation(summary = "Post a transaction")
+    @APIResponse(responseCode = "501", description = "Transaction posting is not implemented", content = @Content)
     public Response transactions() {
         return notImplemented();
     }
@@ -38,6 +49,8 @@ public final class LedgerResource {
     /** The journal query route. */
     @GET
     @Path("journal")
+    @Operation(summary = "Read the journal")
+    @APIResponse(responseCode = "501", description = "Journal queries are not implemented", content = @Content)
     public Response journal() {
         return notImplemented();
     }

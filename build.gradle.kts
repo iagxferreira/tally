@@ -26,6 +26,7 @@ dependencies {
     implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.39.2"))
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-rest-jackson")
+    implementation("io.quarkus:quarkus-smallrye-openapi")
 
     // The domain's only production dependency, and only because
     // java.util.UUID cannot mint a v7: randomUUID() is v4 only, and the JDK
