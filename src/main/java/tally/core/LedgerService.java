@@ -38,6 +38,11 @@ public final class LedgerService {
         return ledger.journal();
     }
 
+    /** Returns the balance derived from the current journal. */
+    public synchronized Money balance(AccountId accountId) {
+        return ledger.balanceOf(accountId);
+    }
+
     private Posting posting(TransactionPostingRequest request) {
         AccountId accountId = AccountId.of(request.accountId());
         Account account = ledger.account(accountId).orElseThrow(() -> new tally.domain.UnknownAccountException(accountId));

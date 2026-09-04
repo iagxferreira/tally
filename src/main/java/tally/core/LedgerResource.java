@@ -10,6 +10,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -18,7 +19,9 @@ import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import tally.domain.AccountId;
 import tally.domain.DomainException;
+import tally.domain.UnknownAccountException;
 
 /** Initial HTTP route contract for the in-memory ledger. */
 @Path("/")
@@ -52,9 +55,22 @@ public final class LedgerResource {
     @GET
     @Path("accounts/{id}/balance")
     @Operation(summary = "Read an account balance")
-    @APIResponse(responseCode = "501", description = "Balance queries are not implemented", content = @Content)
+    @APIResponse(responseCode = "200", description = "Account balance",
+            content = @Content(schema = @Schema(implementation = BalanceResponse.class)))
+    @APIResponse(responseCode = "400", description = "Malformed account identifier", content = @Content)
+    @APIResponse(responseCode = "404", description = "Account not found", content = @Content)
     public Response balance(@PathParam("id") String id) {
-        return notImplemented();
+        try {
+            var accountId = AccountId.of(UUID.fromString(id));
+            return Response.ok(BalanceResponse.from(ledgerService.balance(accountId))).build();
+        } catch (UnknownAccountException exception) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(Map.of("message", exception.getMessage()))
+                    .build();
+        } catch (IllegalArgumentException exception) {
+            return badRequest(exception.getMessage());
+        }
     }
 
     /** The transaction command route. */
@@ -81,13 +97,6 @@ public final class LedgerResource {
     @APIResponse(responseCode = "200", description = "Posted transactions")
     public List<TransactionResponse> journal() {
         return ledgerService.journal().stream().map(TransactionResponse::from).toList();
-    }
-
-    private static Response notImplemented() {
-        return Response.status(Response.Status.NOT_IMPLEMENTED)
-                .type(MediaType.APPLICATION_JSON)
-                .entity(Map.of("message", "not implemented"))
-                .build();
     }
 
     private static Response badRequest(String message) {

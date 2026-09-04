@@ -40,9 +40,40 @@ class LedgerRoutesTest {
     }
 
     @Test
-    void balanceRouteExists() {
+    void readsAnAccountBalance() {
+        String accountId = createAccount("ASSET", "USD");
+
+        given().when().get("/accounts/" + accountId + "/balance")
+                .then().statusCode(200)
+                .body("minorUnits", is(0))
+                .body("currency", is("USD"));
+    }
+
+    @Test
+    void readsBalanceDerivedFromPostedTransactions() {
+        String debitAccount = createAccount("ASSET", "USD");
+        String creditAccount = createAccount("REVENUE", "USD");
+        given().contentType("application/json")
+                .body(transactionJson(debitAccount, creditAccount, 1250, 1250))
+                .when().post("/transactions")
+                .then().statusCode(201);
+
+        given().when().get("/accounts/" + debitAccount + "/balance")
+                .then().statusCode(200)
+                .body("minorUnits", is(1250))
+                .body("currency", is("USD"));
+    }
+
+    @Test
+    void returnsNotFoundForAnUnknownAccount() {
         given().when().get("/accounts/00000000-0000-7000-8000-000000000000/balance")
-                .then().statusCode(501).body("message", is("not implemented"));
+                .then().statusCode(404);
+    }
+
+    @Test
+    void rejectsAMalformedAccountIdentifier() {
+        given().when().get("/accounts/not-an-account-id/balance")
+                .then().statusCode(400);
     }
 
     @Test
@@ -123,6 +154,7 @@ class LedgerRoutesTest {
                 .body("info.title", is("Tally Ledger API"))
                 .body("info.version", is("0.1.0"))
                 .body("components.schemas.AccountResponse", notNullValue())
+                .body("components.schemas.BalanceResponse", notNullValue())
                 .body("paths.'/accounts'.post", notNullValue())
                 .body("paths.'/accounts/{id}/balance'.get", notNullValue())
                 .body("paths.'/transactions'.post", notNullValue())

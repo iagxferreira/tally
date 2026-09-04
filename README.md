@@ -79,6 +79,7 @@ violating them fails to compile rather than failing in production.
 - Quarkus HTTP API with OpenAPI JSON and Swagger UI
 - `POST /accounts` — opens and registers an account in the process-local ledger
 - `POST /transactions` — posts balanced transactions using exact minor units
+- `GET /accounts/{id}/balance` — derives an account balance from its postings
 - `GET /journal` — reads the immutable in-memory journal in posting order
 
 The domain and HTTP contracts are covered by tests. Compilation runs with
@@ -94,8 +95,8 @@ Nothing.
 
 ### Not yet built
 
-Everything outside the in-memory domain: persistence, balance API behavior,
-concurrent posting, idempotency, events, reconciliation. See the phase table
+Everything outside the in-memory domain: persistence, concurrent posting,
+idempotency, events, reconciliation. See the phase table
 below.
 
 The `Ledger` is **not thread-safe**, and deliberately so — the consistency
@@ -120,8 +121,8 @@ until earlier ones are solid.
 | 8 | Performance: measured, never assumed |
 
 Phase 1 is complete. Phase 3 has its HTTP foundation, account creation,
-transaction posting, and journal read slices; balance behavior and production
-concerns remain.
+transaction posting, balance, and journal read slices; production concerns
+remain.
 
 ---
 
@@ -172,7 +173,7 @@ invariant vacuously.
 
 ```
 src/main/java/tally/domain/   the pure financial model
-src/main/java/tally/core/     composition over the domain (empty so far)
+src/main/java/tally/core/     composition over the domain
 src/test/java/tally/domain/   tests
 build.gradle.kts              one module, no module tree
 mise.toml                     pinned JDK and Gradle
