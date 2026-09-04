@@ -2,6 +2,7 @@ import net.ltgt.gradle.errorprone.errorprone
 
 plugins {
     java
+    id("io.quarkus") version "3.39.2"
     id("net.ltgt.errorprone") version "5.1.1"
 }
 
@@ -22,6 +23,10 @@ repositories {
 }
 
 dependencies {
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.39.2"))
+    implementation("io.quarkus:quarkus-rest")
+    implementation("io.quarkus:quarkus-rest-jackson")
+
     // The domain's only production dependency, and only because
     // java.util.UUID cannot mint a v7: randomUUID() is v4 only, and the JDK
     // has no v7 factory as of Java 25. See ADR 003.
@@ -32,6 +37,7 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.12.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.27.3")
+    testImplementation("io.quarkus:quarkus-junit5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
