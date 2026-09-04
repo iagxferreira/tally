@@ -4,12 +4,15 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.Map;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -19,13 +22,32 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Tag(name = "Ledger")
 public final class LedgerResource {
 
+    private final LedgerService ledgerService;
+
+    /** Creates the resource with its application-scoped ledger service. */
+    @Inject
+    public LedgerResource(LedgerService ledgerService) {
+        this.ledgerService = ledgerService;
+    }
+
     /** The account command route. */
     @POST
     @Path("accounts")
+    @Consumes(MediaType.APPLICATION_JSON)
     @Operation(summary = "Create an account")
-    @APIResponse(responseCode = "501", description = "Account creation is not implemented", content = @Content)
-    public Response accounts() {
-        return notImplemented();
+    @APIResponse(responseCode = "201", description = "Account created",
+            content = @Content(schema = @Schema(implementation = AccountResponse.class)))
+    @APIResponse(responseCode = "400", description = "Malformed account request", content = @Content)
+    public Response accounts(CreateAccountRequest request) {
+        if (request == null || request.kind() == null || request.currency() == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .type(MediaType.APPLICATION_JSON)
+                    .entity(Map.of("message", "kind and currency are required"))
+                    .build();
+        }
+        AccountResponse account = AccountResponse.from(
+                ledgerService.openAccount(request.kind(), request.currency()));
+        return Response.status(Response.Status.CREATED).entity(account).build();
     }
 
     /** The account balance query route. */

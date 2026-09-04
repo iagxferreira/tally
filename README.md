@@ -10,7 +10,7 @@ systems.**
 > be made here until there is evidence to support it. At the time of writing
 > the in-memory domain is complete: Tally can open accounts, record balanced
 > transactions in an append-only journal, derive balances from it, and correct
-> mistakes by reversal. **There is no persistence, no API and no concurrency
+> mistakes by reversal. **There is no persistence, no transaction API and no durable concurrency
 > support** — the ledger lives in memory, is not thread-safe, and disappears
 > when the process does. The status section below is the source of truth;
 > please read it before assuming any capability is present.
@@ -76,6 +76,8 @@ violating them fails to compile rather than failing in production.
   duplicates, and refuses a reversal of something never posted
 - `DomainException` — sealed hierarchy, so a handler switching over domain
   failures is checked for exhaustiveness and needs no `default` branch
+- Quarkus HTTP API with OpenAPI JSON and Swagger UI
+- `POST /accounts` — opens and registers an account in the process-local ledger
 
 155 tests. Compilation runs with `-Xlint:all -Werror` and Error Prone.
 
@@ -89,8 +91,9 @@ Nothing.
 
 ### Not yet built
 
-Everything outside the in-memory domain: persistence, an API, concurrent
-posting, idempotency, events, reconciliation. See the phase table below.
+Everything outside the in-memory domain: persistence, transaction and journal
+API behavior, concurrent posting, idempotency, events, reconciliation. See the
+phase table below.
 
 The `Ledger` is **not thread-safe**, and deliberately so — the consistency
 guarantees of concurrent posting need a real storage model to answer, and
@@ -106,14 +109,15 @@ until earlier ones are solid.
 |---|---|
 | 1 | ✅ Domain: accounts, postings, transactions, double-entry validation, in-memory ledger |
 | 2 | Persistence: PostgreSQL, isolation levels, concurrent posting, immutable journal |
-| 3 | API: HTTP, with the domain kept free of HTTP types |
+| 3 | [in progress] API: HTTP, with the domain kept free of HTTP types |
 | 4 | Idempotency: safe retries of financial operations |
 | 5 | Events: transactional outbox, delivery semantics stated precisely |
 | 6 | Reconciliation: detecting divergence against an external processor |
 | 7 | Production engineering: tracing, metrics, health checks, failure injection |
 | 8 | Performance: measured, never assumed |
 
-Phase 1 is complete. Nothing beyond it has been started.
+Phase 1 is complete. Phase 3 has its HTTP foundation and account-creation slice;
+the remaining API behavior is not implemented.
 
 ---
 

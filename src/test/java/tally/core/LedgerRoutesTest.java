@@ -13,8 +13,30 @@ import org.junit.jupiter.api.Test;
 class LedgerRoutesTest {
 
     @Test
-    void accountsRouteExists() {
-        given().when().post("/accounts").then().statusCode(501).body("message", is("not implemented"));
+    void accountsRouteRequiresJson() {
+        given().when().post("/accounts").then().statusCode(415);
+    }
+
+    @Test
+    void rejectsAnIncompleteAccountRequest() {
+        given().contentType("application/json")
+                .body("{}")
+                .when().post("/accounts")
+                .then().statusCode(400)
+                .body("message", is("kind and currency are required"));
+    }
+
+    @Test
+    void createsAnAccount() {
+        given().contentType("application/json")
+                .body("""
+                        {"kind":"ASSET","currency":"USD"}
+                        """)
+                .when().post("/accounts")
+                .then().statusCode(201)
+                .body("id", notNullValue())
+                .body("kind", is("ASSET"))
+                .body("currency", is("USD"));
     }
 
     @Test
@@ -41,6 +63,7 @@ class LedgerRoutesTest {
                 .contentType(containsString("application/json"))
                 .body("info.title", is("Tally Ledger API"))
                 .body("info.version", is("0.1.0"))
+                .body("components.schemas.AccountResponse", notNullValue())
                 .body("paths.'/accounts'.post", notNullValue())
                 .body("paths.'/accounts/{id}/balance'.get", notNullValue())
                 .body("paths.'/transactions'.post", notNullValue())
