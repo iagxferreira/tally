@@ -23,8 +23,7 @@ class LedgerRoutesTest {
         given().contentType("application/json")
                 .body("{}")
                 .when().post("/accounts")
-                .then().statusCode(400)
-                .body("message", is("kind and currency are required"));
+                .then().statusCode(400);
     }
 
     @Test

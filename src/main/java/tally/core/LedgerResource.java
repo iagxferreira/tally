@@ -11,6 +11,8 @@ import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -40,13 +42,7 @@ public final class LedgerResource {
     @APIResponse(responseCode = "201", description = "Account created",
             content = @Content(schema = @Schema(implementation = AccountResponse.class)))
     @APIResponse(responseCode = "400", description = "Malformed account request", content = @Content)
-    public Response accounts(CreateAccountRequest request) {
-        if (request == null || request.kind() == null || request.currency() == null) {
-            return Response.status(Response.Status.BAD_REQUEST)
-                    .type(MediaType.APPLICATION_JSON)
-                    .entity(Map.of("message", "kind and currency are required"))
-                    .build();
-        }
+    public Response accounts(@NotNull @Valid CreateAccountRequest request) {
         var account = AccountResponse.from(
                 ledgerService.openAccount(request.kind(), request.currency()));
         return Response.status(Response.Status.CREATED).entity(account).build();
@@ -68,15 +64,12 @@ public final class LedgerResource {
     @Operation(summary = "Post a transaction")
     @APIResponse(responseCode = "201", description = "Transaction posted", content = @Content)
     @APIResponse(responseCode = "400", description = "Invalid transaction", content = @Content)
-    public Response transactions(PostTransactionRequest request) {
-        if (request == null || request.postings() == null || request.postings().isEmpty()) {
-            return badRequest("at least two postings are required");
-        }
+    public Response transactions(@NotNull @Valid PostTransactionRequest request) {
         try {
             return Response.status(Response.Status.CREATED)
                     .entity(TransactionResponse.from(ledgerService.postTransaction(request)))
                     .build();
-        } catch (DomainException | IllegalArgumentException | NullPointerException exception) {
+        } catch (DomainException | IllegalArgumentException exception) {
             return badRequest(exception.getMessage());
         }
     }

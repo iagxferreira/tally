@@ -27,6 +27,7 @@ dependencies {
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-smallrye-openapi")
+    implementation("io.quarkus:quarkus-hibernate-validator")
 
     // The domain's only production dependency, and only because
     // java.util.UUID cannot mint a v7: randomUUID() is v4 only, and the JDK
