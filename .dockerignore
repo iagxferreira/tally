@@ -1,0 +1,12 @@
+.git
+.gradle
+build
+bin
+nodes
+.idea
+.settings
+.classpath
+.factorypath
+.project
+*.iml
+.env

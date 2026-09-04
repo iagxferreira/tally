@@ -7,7 +7,7 @@ status: todo
 depends_on: [01M1MH42R29DSSV5055BMP2XM1]
 relates_to: [01M1M2TYB9BP16Z9RYEKJTBW3C]
 created: 2026-09-03T17:02:50.159289275Z
-updated: 2026-09-03T20:59:52.674659830Z
+updated: 2026-09-04T00:49:38.534721779Z
 ---
 
 Requested 2026-09-03 alongside the Java rewrite
@@ -48,3 +48,7 @@ two should be considered together.
 
 **Done when:** it is decided which of the two images is wanted, and only that
 one is written.</body>
+
+## Updated scope, 2026-09-03
+
+HTTP now exists as a Quarkus route layer, so a runtime image is no longer purely hypothetical. Docker is installed, but local `native-image` is absent. Quarkus's current native-image guide documents GraalVM/Mandrel for JDK 21, while Tally's compile toolchain is Java 25. Native compilation therefore needs an explicit choice: retain Java 25 and validate a compatible container builder, downgrade the project toolchain to Java 21, or configure JVM Docker packaging first and defer native packaging.
